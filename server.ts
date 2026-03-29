@@ -11,6 +11,7 @@ import cartRouter from './routes/cart.route';
 import addressRouter from './routes/address.route';
 import paymentRouter from './routes/payment.route';
 import orderRouter from './routes/order.route';
+import wishlistRouter from './routes/wishlist.route';
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.use('/api/cart' , cartRouter) ;
 app.use('/api/address' , addressRouter) ;
 app.use('/api/payment' , paymentRouter) ;
 app.use('/api/orders' , orderRouter) ;
+app.use('/api/wishlist' , wishlistRouter) ;
 
 app.listen(PORT, ()=>{
       console.log(`server running at => http://localhost:${PORT} ;`);
