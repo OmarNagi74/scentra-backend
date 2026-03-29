@@ -253,7 +253,6 @@ export class auth_services {
         }
 
         return {
-            userId: user.id,
             orders_count: user._count.orders,
             reviews_count: user._count.reviews,
         };
