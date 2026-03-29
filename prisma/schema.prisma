@@ -52,6 +52,10 @@ model User {
   full_name     String   @db.VarChar(255)
   email         String   @unique @db.VarChar(255)
   password_hash String   @db.VarChar(255)
+  is_email_verified                Boolean   @default(false)
+  email_verification_code_hash     String?
+  email_verification_code_expires_at DateTime?
+  email_verification_sent_at       DateTime?
   phone         String?  @db.VarChar(20)
   role          Role     @default(customer)
   points        Int      @default(0)

@@ -18,7 +18,7 @@ export const register = async (req: Request, res: Response) => {
         const result = await authService.registerService(full_name, email, password);
 
         res.status(201).json({
-            msg : "User registered successfully",
+            msg : "User registered. Please verify your email.",
             data : result
         });
     }
@@ -48,8 +48,63 @@ export const Login = async (req : Request , res : Response) =>{
         });
     }
     catch(err : any){
+        if (err.message === "EMAIL_NOT_VERIFIED") {
+            res.status(403).json({
+                msg: "Email is not verified. Please verify before signing in.",
+            });
+            return;
+        }
+
         res.status(400).json({
             msg : err.message
+        });
+    }
+}
+
+export const verifyEmail = async (req: Request, res: Response) => {
+    try {
+        const { email, code } = req.body;
+
+        if (!email || !code) {
+            res.status(400).json({
+                msg: "Email and verification code are required",
+            });
+            return;
+        }
+
+        const result = await authService.verifyEmailService(email, code);
+
+        res.status(200).json({
+            msg: result.message,
+        });
+    }
+    catch (err: any) {
+        res.status(400).json({
+            msg: err.message,
+        });
+    }
+}
+
+export const resendVerification = async (req: Request, res: Response) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            res.status(400).json({
+                msg: "Email is required",
+            });
+            return;
+        }
+
+        const result = await authService.resendVerificationService(email);
+
+        res.status(200).json({
+            msg: result.message,
+        });
+    }
+    catch (err: any) {
+        res.status(400).json({
+            msg: err.message,
         });
     }
 }
