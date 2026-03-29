@@ -126,6 +126,22 @@ export const getMe = async(req : any , res : Response) =>{
     }
 }
 
+export const getMyStats = async (req: any, res: Response) => {
+    try {
+        const userId = req.user.userId;
+        const stats = await authService.getMyStatsService(userId);
+
+        res.status(200).json({
+            stats,
+        });
+    }
+    catch (err: any) {
+        res.status(400).json({
+            msg: err.message,
+        });
+    }
+}
+
 export const updateProfile = async(req : any ,  res : Response) =>{
 
     try{

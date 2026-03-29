@@ -232,6 +232,33 @@ export class auth_services {
         return user ;
     }
 
+    async getMyStatsService(userId: string) {
+        const user = await prisma.user.findUnique({
+            where: {
+                id: userId,
+            },
+            select: {
+                id: true,
+                _count: {
+                    select: {
+                        orders: true,
+                        reviews: true,
+                    },
+                },
+            },
+        });
+
+        if (!user) {
+            throw new Error("User not found");
+        }
+
+        return {
+            userId: user.id,
+            orders_count: user._count.orders,
+            reviews_count: user._count.reviews,
+        };
+    }
+
     async updateProfileService (userId : string , data : {
         full_name?:string,
         phone?:string
