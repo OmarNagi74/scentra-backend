@@ -33,6 +33,35 @@ export class payment_services {
         return paymentMethod;
     }
 
+    async updatePaymentMethodService (
+        userId : string ,
+        paymentMethodId : string ,
+        data : {
+            type?: string;
+            provider?: string;
+            last4?: string;
+        }
+    ){
+
+        const paymentMethod = await prisma.paymentMethod.findFirst({
+            where : {
+                id : paymentMethodId,
+                user_id : userId
+            }
+        });
+
+        if(!paymentMethod) throw new Error("Payment method not found") ;
+
+        const updatedPaymentMethod = await prisma.paymentMethod.update({
+            where : {
+                id : paymentMethodId
+            },
+            data
+        });
+
+        return updatedPaymentMethod;
+    }
+
     async deletePaymentMethodService (userId : string , paymentMethodId : string){
 
         const paymentMethod = await prisma.paymentMethod.findFirst({

@@ -52,3 +52,24 @@ export const updateAddress = async (req : any , res : Response) => {
         res.status(500).json({ error: error.message });
     }
 }
+
+export const deleteAddress = async (req : any , res : Response) => {
+
+    try {
+        const userId = req.user.userId ;
+        const addressId = req.params.id ;
+
+        await addressService.deleteAddressService(userId , addressId) ;
+        res.status(200).json({
+            msg : "Address deleted successfully"
+        });
+    }
+    catch (error : any ) {
+        if(error.message === "Address not found"){
+            res.status(404).json({ error: error.message });
+            return;
+        }
+
+        res.status(500).json({ error: error.message });
+    }
+}

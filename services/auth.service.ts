@@ -277,4 +277,23 @@ export class auth_services {
             }
         });
     }
+
+    async logoutService(userId : string){
+
+        const user = await prisma.user.findUnique({
+            where : {
+                id : userId
+            },
+            select : {
+                id : true
+            }
+        });
+
+        if(!user) throw new Error("User not found");
+
+        // JWT is stateless in current architecture, so logout is client token disposal.
+        return {
+            msg : "Logged out successfully"
+        };
+    }
 }

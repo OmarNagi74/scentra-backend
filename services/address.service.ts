@@ -96,5 +96,49 @@ export class address_services {
 
         return updatedAddress ;
     }
+
+    async deleteAddressService(userId : string , addressId : string){
+
+        const address = await prisma.address.findFirst({
+            where : {
+                id : addressId,
+                user_id : userId
+            }
+        });
+
+        if(!address){
+            throw new Error("Address not found");
+        }
+
+        await prisma.address.delete({
+            where : {
+                id : addressId
+            }
+        });
+
+        if(address.is_default){
+            const nextAddress = await prisma.address.findFirst({
+                where : {
+                    user_id : userId
+                },
+                orderBy : {
+                    created_at : "desc"
+                }
+            });
+
+            if(nextAddress){
+                await prisma.address.update({
+                    where : {
+                        id : nextAddress.id
+                    },
+                    data : {
+                        is_default : true
+                    }
+                });
+            }
+        }
+
+        return { message : "Address deleted successfully" };
+    }
     
 }

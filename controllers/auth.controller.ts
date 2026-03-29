@@ -168,3 +168,18 @@ export const changePassword  = async(req : any , res : Response) =>{
         });
     }
 }
+
+export const logout = async(req : any , res : Response) =>{
+
+    try{
+        const userId = req.user.userId ;
+        const result = await authService.logoutService(userId);
+
+        res.status(200).json(result);
+    }
+    catch(err : any){
+        res.status(400).json({
+            msg : err.message
+        });
+    }
+}
