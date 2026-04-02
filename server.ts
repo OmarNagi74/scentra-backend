@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import morgan from 'morgan' ;
+import path from 'path';
 import authRouter from './routes/auth.route';
 import "dotenv/config";
 import homeRouter from './routes/home.route';
@@ -22,6 +23,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({extended :true})) ;
 app.use(morgan("dev"));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // apis
 

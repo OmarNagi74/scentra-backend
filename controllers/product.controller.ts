@@ -1,5 +1,7 @@
 import { Request , Response } from "express";
+import multer from "multer";
 import { product_services } from "../services/product.service";
+import { toPublicUploadPath } from "../utils/uploadFile";
 
 const productService = new product_services() ;
 
@@ -61,6 +63,54 @@ export const updateProduct = async (req : any , res : Response) => {
     }
     catch (error : any) {
         res.status(500).json({ error : error.message }) ;
+    }
+}
+
+export const uploadProductImageById = async (req: any, res: Response) => {
+    try {
+        const product_id = req.params.id;
+
+        if (!req.file) {
+            res.status(400).json({ error: "Product image is required" });
+            return;
+        }
+
+        const image_url = toPublicUploadPath(req.file.path);
+        const updatedProduct = await productService.updateProductImageService(product_id, image_url);
+        res.status(200).json(updatedProduct);
+    }
+    catch (error: any) {
+        if (error instanceof multer.MulterError) {
+            const statusCode = error.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+            res.status(statusCode).json({ error: error.message });
+            return;
+        }
+
+        res.status(500).json({ error: error.message });
+    }
+}
+
+export const addBrandLogoImage = async (req: any, res: Response) => {
+    try {
+        const brand_id = req.params.brand_id;
+
+        if (!req.file) {
+            res.status(400).json({ error: "Brand logo is required" });
+            return;
+        }
+
+        const logo_url = toPublicUploadPath(req.file.path);
+        const brand = await productService.updateBrandLogoService(brand_id, logo_url);
+        res.status(200).json(brand);
+    }
+    catch (error: any) {
+        if (error instanceof multer.MulterError) {
+            const statusCode = error.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+            res.status(statusCode).json({ error: error.message });
+            return;
+        }
+
+        res.status(500).json({ error: error.message });
     }
 }
 

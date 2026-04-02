@@ -1,5 +1,7 @@
 import { Request , Response } from "express";
+import multer from "multer";
 import { auth_services } from "../services/auth.service";
+import { toPublicUploadPath } from "../utils/uploadFile";
 
 const authService = new auth_services() ;
 
@@ -146,9 +148,9 @@ export const updateProfile = async(req : any ,  res : Response) =>{
 
     try{
         const userId = req.user.userId ;
-        const {full_name , phone} = req.body ;
+        const {full_name , phone, avatar_url} = req.body ;
 
-        const result = await authService.updateProfileService(userId , {full_name , phone});
+        const result = await authService.updateProfileService(userId , {full_name , phone, avatar_url});
 
         res.status(200).json({
             result
@@ -157,6 +159,40 @@ export const updateProfile = async(req : any ,  res : Response) =>{
     catch(err : any){
         res.status(400).json({
             msg : err.message
+        });
+    }
+}
+
+export const uploadAvatarImage = async (req: any, res: Response) => {
+    try {
+        const userId = req.user.userId;
+
+        if (!req.file) {
+            res.status(400).json({
+                msg: "Avatar image is required",
+            });
+            return;
+        }
+
+        const avatarUrl = toPublicUploadPath(req.file.path);
+        const result = await authService.updateAvatarService(userId, avatarUrl);
+
+        res.status(200).json({
+            msg: "Avatar uploaded successfully",
+            result,
+        });
+    }
+    catch (err: any) {
+        if (err instanceof multer.MulterError) {
+            const statusCode = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+            res.status(statusCode).json({
+                msg: err.message,
+            });
+            return;
+        }
+
+        res.status(400).json({
+            msg: err.message,
         });
     }
 }

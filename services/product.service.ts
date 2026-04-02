@@ -1,4 +1,5 @@
 import {prisma} from "../model/prisma" ;
+import { deleteLocalUploadIfExists } from "../utils/uploadFile";
 
 export class product_services {
     constructor(){} 
@@ -145,6 +146,15 @@ export class product_services {
         is_featured?: boolean;
         is_new_arrival?: boolean;
     }) {
+        const existingProduct = await prisma.product.findUnique({
+            where: { id: product_id },
+            select: { id: true, image_url: true },
+        });
+
+        if (!existingProduct) {
+            throw new Error("Product not found");
+        }
+
         const product = await prisma.product.update({
             where : {id : product_id},
             data : {
@@ -158,7 +168,64 @@ export class product_services {
             }        
         });
 
+        if (
+            data.image_url &&
+            existingProduct.image_url &&
+            existingProduct.image_url !== data.image_url
+        ) {
+            await deleteLocalUploadIfExists(existingProduct.image_url);
+        }
+
         return product ;
+    }
+
+    async updateProductImageService(product_id: string, image_url: string) {
+        const existingProduct = await prisma.product.findUnique({
+            where: { id: product_id },
+            select: { id: true, image_url: true },
+        });
+
+        if (!existingProduct) {
+            throw new Error("Product not found");
+        }
+
+        const product = await prisma.product.update({
+            where: { id: product_id },
+            data: { image_url },
+            include: {
+                brand: { select: { id: true, name: true } },
+                sizes: true,
+            },
+        });
+
+        if (existingProduct.image_url && existingProduct.image_url !== image_url) {
+            await deleteLocalUploadIfExists(existingProduct.image_url);
+        }
+
+        return product;
+    }
+
+    async updateBrandLogoService(brand_id: string, logo_url: string) {
+        const existingBrand = await prisma.brand.findUnique({
+            where: { id: brand_id },
+            select: { id: true, logo_url: true },
+        });
+
+        if (!existingBrand) {
+            throw new Error("Brand not found");
+        }
+
+        const brand = await prisma.brand.update({
+            where: { id: brand_id },
+            data: { logo_url },
+            select: { id: true, name: true, logo_url: true },
+        });
+
+        if (existingBrand.logo_url && existingBrand.logo_url !== logo_url) {
+            await deleteLocalUploadIfExists(existingBrand.logo_url);
+        }
+
+        return brand;
     }
 
     // deleteProduct

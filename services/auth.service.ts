@@ -2,6 +2,7 @@ import { prisma } from "../model/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { randomInt } from "crypto";
+import { deleteLocalUploadIfExists } from "../utils/uploadFile";
 
 export class auth_services {
     constructor(){}
@@ -214,6 +215,7 @@ export class auth_services {
                 full_name: true,
                 email: true,
                 phone: true,
+                avatar_url: true,
                 role: true,
                 points: true,                
                 created_at: true,
@@ -260,8 +262,23 @@ export class auth_services {
 
     async updateProfileService (userId : string , data : {
         full_name?:string,
-        phone?:string
+        phone?:string,
+        avatar_url?:string
     }){
+        const existingUser = await prisma.user.findUnique({
+            where: {
+                id: userId,
+            },
+            select: {
+                id: true,
+                avatar_url: true,
+            },
+        });
+
+        if (!existingUser) {
+            throw new Error("User not found");
+        }
+
         const user = await prisma.user.update({
             where : {
                 id : userId
@@ -272,10 +289,57 @@ export class auth_services {
                 full_name: true,
                 email: true,
                 phone: true,
+                avatar_url: true,
             }
         });
 
+        if (
+            data.avatar_url &&
+            existingUser.avatar_url &&
+            existingUser.avatar_url !== data.avatar_url
+        ) {
+            await deleteLocalUploadIfExists(existingUser.avatar_url);
+        }
+
         return user ;
+    }
+
+    async updateAvatarService(userId: string, avatar_url: string) {
+        const existingUser = await prisma.user.findUnique({
+            where: {
+                id: userId,
+            },
+            select: {
+                id: true,
+                avatar_url: true,
+            },
+        });
+
+        if (!existingUser) {
+            throw new Error("User not found");
+        }
+
+        const user = await prisma.user.update({
+            where: {
+                id: userId,
+            },
+            data: {
+                avatar_url,
+            },
+            select: {
+                id: true,
+                full_name: true,
+                email: true,
+                phone: true,
+                avatar_url: true,
+            },
+        });
+
+        if (existingUser.avatar_url && existingUser.avatar_url !== avatar_url) {
+            await deleteLocalUploadIfExists(existingUser.avatar_url);
+        }
+
+        return user;
     }
 
     async changePasswordService (userId : string , oldpass : string , newpass : string){
