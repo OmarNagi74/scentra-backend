@@ -8,12 +8,18 @@ const productService = new product_services() ;
 export const getProducts = async (req : Request , res : Response) => {
 
     try {
-        const {brand_id, gender, fragrance_family, search, page, limit} = req.query ;
+        const {brand_id, gender, fragrance_family, search, is_new_arrival, page, limit} = req.query ;
+
+        let isNewArrival: boolean | undefined;
+        if (typeof is_new_arrival === "string") {
+            isNewArrival = is_new_arrival.toLowerCase() === "true";
+        }
 
         const products = await productService.search_product({
             brand_id : brand_id as string ,
             gender : gender as string ,
             fragrance_family : fragrance_family as string ,
+            is_new_arrival : isNewArrival,
             search : search as string ,
             page : parseInt(page as string) || 1 ,
             limit : parseInt(limit as string) || 10

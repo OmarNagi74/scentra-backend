@@ -9,18 +9,20 @@ export class product_services {
         brand_id? : string ,
         gender? : string ,
         fragrance_family? : string ,
+        is_new_arrival? : boolean ,
         search? : string ,
         page? : number ,
         limit? : number
     }){
 
-        const { brand_id , gender , fragrance_family , search , page = 1 , limit = 10 } = fillters ;
+        const { brand_id , gender , fragrance_family , is_new_arrival, search , page = 1 , limit = 10 } = fillters ;
 
         const where : any = {} ;
 
         if(brand_id) where.brand_id = brand_id ;
         if(gender) where.gender = gender ;
         if(fragrance_family) where.fragrance_family = fragrance_family ;
+        if(typeof is_new_arrival === "boolean") where.is_new_arrival = is_new_arrival ;
         if(search) where.OR = [
             { name : { contains : search , mode : "insensitive" } } ,
             { description : { contains : search , mode : "insensitive" } } ,

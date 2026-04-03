@@ -5,8 +5,9 @@ const homeServices = new home_services() ;
 
 export const home = async(req : Request , res : Response) => {
     try {
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-        const result = await homeServices.getHomeData() ;
+        const result = await homeServices.getHomeData(baseUrl) ;
 
         res.status(200).json({
             data : result

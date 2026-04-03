@@ -9,7 +9,7 @@ productRouter.get("/" , getProducts) ;
 productRouter.get("/:id" , getProductById) ;
 productRouter.get('/:id/reviews', getProductReviews);
 
-productRouter.post('/:id/reviews' , addProductReview) ;
+productRouter.post('/:id/reviews' , authMiddleware() , addProductReview) ;
 
 productRouter.post('/' , authMiddleware(["admin"]) , createProduct) ;
 productRouter.patch('/brands/:brand_id/logo' , authMiddleware(["admin"]) , uploadBrandLogo.single('logo') , addBrandLogoImage) ;

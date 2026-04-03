@@ -6,6 +6,6 @@ const orderRouter = Router() ;
 
 orderRouter.post('/' ,  authMiddleware() ,placeOrder);
 orderRouter.get('/' , authMiddleware() ,getOrderHistory);
-orderRouter.get('/:order_id' , authMiddleware() ,getOrderById);
+orderRouter.get('/:id' , authMiddleware() ,getOrderById);
 
 export default orderRouter ;
