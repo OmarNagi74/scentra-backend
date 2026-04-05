@@ -197,6 +197,23 @@ export const uploadAvatarImage = async (req: any, res: Response) => {
     }
 }
 
+export const removeAvatarImage = async (req: any, res: Response) => {
+    try {
+        const userId = req.user.userId;
+        const result = await authService.removeAvatarService(userId);
+
+        res.status(200).json({
+            msg: "Avatar removed successfully",
+            result,
+        });
+    }
+    catch (err: any) {
+        res.status(400).json({
+            msg: err.message,
+        });
+    }
+}
+
 export const changePassword  = async(req : any , res : Response) =>{
 
     try{

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { changePassword, getMe, getMyStats, Login, logout, register, resendVerification, updateProfile, uploadAvatarImage, verifyEmail } from "../controllers/auth.controller";
+import { changePassword, getMe, getMyStats, Login, logout, register, removeAvatarImage, resendVerification, updateProfile, uploadAvatarImage, verifyEmail } from "../controllers/auth.controller";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import { uploadAvatar } from "../middlewares/uploadMiddleware";
 
@@ -14,6 +14,8 @@ authRouter.get('/me' , authMiddleware() ,getMe) ;
 authRouter.get('/me/stats' , authMiddleware() ,getMyStats) ;
 authRouter.patch('/update' , authMiddleware() , updateProfile);
 authRouter.patch('/avatar' , authMiddleware() , uploadAvatar.single('avatar') , uploadAvatarImage);
+authRouter.delete('/avatar' , authMiddleware() , removeAvatarImage);
+authRouter.patch('/me/password' , authMiddleware() , changePassword);
 authRouter.patch('/me/passward' , authMiddleware() , changePassword);
 
 export default authRouter ;

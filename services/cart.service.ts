@@ -20,7 +20,8 @@ export class cart_services {
                                 sizes : {
                                     select : {  
                                         size : true ,
-                                        price : true
+                                        price : true,
+                                        stock : true
                                     }
                                 }
                             }
@@ -91,11 +92,16 @@ export class cart_services {
         });
 
         if(existingCartItem){
+            const nextQuantity = existingCartItem.quantity + quantity;
+            if (nextQuantity > productsize.stock) {
+                throw new Error("Quantity exceeds available stock");
+            }
+
             // update quantity
             await prisma.cartItem.update({
                 where : {id : existingCartItem.id} ,
                 data : {
-                    quantity : existingCartItem.quantity + quantity
+                    quantity : nextQuantity
                 }                
             });            
         }
@@ -124,6 +130,19 @@ export class cart_services {
             throw new Error("Cart not found for user");
         }
 
+        const productsize = await prisma.productSize.findUnique({
+            where: {
+                product_id_size: {
+                    product_id: productId,
+                    size: size
+                }
+            }
+        });
+
+        if (!productsize) {
+            throw new Error("Product size not found");
+        }
+
         if(quantity <= 0){
             // delete item
             await prisma.cartItem.delete({
@@ -137,6 +156,10 @@ export class cart_services {
             });
         }
         else{
+            if (quantity > productsize.stock) {
+                throw new Error("Quantity exceeds available stock");
+            }
+
             // update quantity
             await prisma.cartItem.update({
                 where : {

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { Request , Response } from "express";
 import multer from "multer";
 import { product_services } from "../services/product.service";
@@ -149,10 +150,11 @@ export const addProductReview = async (req : any , res : Response) => {
     try {
         const product_id = req.params.id ;
         const user_id = req.user.userId ;
-        const { rating , comment } = req.body ;
+        const rating = Number(req.body.rating) ;
+        const comment = typeof req.body.comment === "string" ? req.body.comment : undefined ;
 
-        if(!rating){
-            res.status(400).json({ error : "Rating is required" }) ;
+        if(!Number.isInteger(rating) || rating < 1 || rating > 5){
+            res.status(400).json({ error : "Rating must be between 1 and 5" }) ;
             return ;
         }
 
@@ -160,6 +162,24 @@ export const addProductReview = async (req : any , res : Response) => {
         res.status(201).json(review) ;
     }
     catch (error : any) {
-        res.status(500).json({ error : error.message }) ;
+        const message = (error?.message ?? "").toString() ;
+        const lower = message.toLowerCase() ;
+
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+            res.status(409).json({ error : "You have already reviewed this product." }) ;
+            return ;
+        }
+
+        if (lower.includes("purchased")) {
+            res.status(403).json({ error : message }) ;
+            return ;
+        }
+
+        if (lower.includes("rating")) {
+            res.status(400).json({ error : message }) ;
+            return ;
+        }
+
+        res.status(500).json({ error : message || "Failed to submit review" }) ;
     }
 }

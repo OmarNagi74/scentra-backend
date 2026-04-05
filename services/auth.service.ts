@@ -40,6 +40,9 @@ export class auth_services {
         const existingUser = await prisma.user.findUnique({
             where : {
                 email : normalizedEmail
+            },
+            select : {
+                id : true
             }
         });
 
@@ -84,6 +87,14 @@ export class auth_services {
         const user = await prisma.user.findUnique({
             where : {
                 email : normalizedEmail
+            },
+            select : {
+                id: true,
+                full_name: true,
+                email: true,
+                password_hash: true,
+                role: true,
+                is_email_verified: true,
             }
         });
 
@@ -133,6 +144,14 @@ export class auth_services {
             where: {
                 email: normalizedEmail,
             },
+            select: {
+                id: true,
+                email: true,
+                is_email_verified: true,
+                email_verification_code_hash: true,
+                email_verification_code_expires_at: true,
+                email_verification_sent_at: true,
+            },
         });
 
         if (!user) {
@@ -177,6 +196,14 @@ export class auth_services {
         const user = await prisma.user.findUnique({
             where: {
                 email: normalizedEmail,
+            },
+            select: {
+                id: true,
+                email: true,
+                is_email_verified: true,
+                email_verification_code_hash: true,
+                email_verification_code_expires_at: true,
+                email_verification_sent_at: true,
             },
         });
 
@@ -255,8 +282,11 @@ export class auth_services {
         }
 
         return {
-            orders_count: user._count.orders,
+            total_orders: user._count.orders,
             reviews_count: user._count.reviews,
+            // Backward-compatible aliases for existing clients.
+            orders_count: user._count.orders,
+            delivered_orders: user._count.orders,
         };
     }
 
@@ -342,11 +372,53 @@ export class auth_services {
         return user;
     }
 
+    async removeAvatarService(userId: string) {
+        const existingUser = await prisma.user.findUnique({
+            where: {
+                id: userId,
+            },
+            select: {
+                id: true,
+                avatar_url: true,
+            },
+        });
+
+        if (!existingUser) {
+            throw new Error("User not found");
+        }
+
+        const user = await prisma.user.update({
+            where: {
+                id: userId,
+            },
+            data: {
+                avatar_url: null,
+            },
+            select: {
+                id: true,
+                full_name: true,
+                email: true,
+                phone: true,
+                avatar_url: true,
+            },
+        });
+
+        if (existingUser.avatar_url) {
+            await deleteLocalUploadIfExists(existingUser.avatar_url);
+        }
+
+        return user;
+    }
+
     async changePasswordService (userId : string , oldpass : string , newpass : string){
 
         const user = await prisma.user.findUnique({
             where : {
                 id : userId
+            },
+            select : {
+                id : true,
+                password_hash : true
             }
         });
 

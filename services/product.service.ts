@@ -263,7 +263,7 @@ export class product_services {
             }
         });
 
-        if(!orderItem) throw new Error("You can only review products you have purchased") ;
+        //if(!orderItem) throw new Error("You can only review products you have purchased") ;
 
         const review = await prisma.review.create({
             data : {

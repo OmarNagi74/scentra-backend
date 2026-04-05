@@ -1,0 +1,2 @@
+-- Intentionally left blank.
+-- This migration folder was present without a migration.sql file, which prevents Prisma deploy from running.
