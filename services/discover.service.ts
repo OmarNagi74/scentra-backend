@@ -1,4 +1,18 @@
 import { prisma } from "../model/prisma";
+import { toAbsoluteUploadUrl } from "../utils/uploadFile";
+
+const normalizeDiscoverProduct = (baseUrl: string, product: any) => ({
+  id: product?.id ?? "",
+  name: product?.name ?? "",
+  image: toAbsoluteUploadUrl(baseUrl, product?.image_url),
+  brandId: product?.brand?.id,
+  brand: product?.brand?.name ?? "",
+  price: product?.sizes?.[0]?.price || 0,
+  gender: product?.gender,
+  family: product?.fragrance_family,
+  isFeatured: product?.is_featured,
+  isNewArrival: product?.is_new_arrival,
+});
 
 // Fragrance family images (can be moved to DB later)
 const familyImages: Record<string, string> = {
@@ -13,7 +27,7 @@ const familyImages: Record<string, string> = {
 export class discover_services {
   constructor() {}
 
-  async getDiscoverData() {
+  async getDiscoverData(baseUrl = "") {
     const [familiesRaw, trendingRaw, featuredBrandsRaw] = await Promise.all([
       prisma.product.groupBy({
         by: ["fragrance_family"],
@@ -78,21 +92,14 @@ export class discover_services {
       products.find((p) => p.id === id)
     );
 
-    const trending = sortedProducts.map((p) => ({
-      id: p?.id,
-      name: p?.name,
-      image: p?.image_url,
-      brandId: p?.brand.id,
-      brand: p?.brand.name,
-      price: p?.sizes[0]?.price || 0,
-    }));
+    const trending = sortedProducts.map((p) => normalizeDiscoverProduct(baseUrl, p));
 
     // Format featured brands
     const featuredBrands = featuredBrandsRaw.map((brand: any) => ({
       id: brand.id,
       name: brand.name,
-      logo_url: brand.logo_url,
-      image: brand.products[0]?.image_url || brand.logo_url,
+      logo_url: toAbsoluteUploadUrl(baseUrl, brand.logo_url),
+      image: toAbsoluteUploadUrl(baseUrl, brand.products[0]?.image_url || brand.logo_url),
     }));
 
     return {
@@ -102,7 +109,7 @@ export class discover_services {
     };
   }
 
-  async searchBrands(query: string) {
+  async searchBrands(query: string, baseUrl = "") {
     const brands = await prisma.brand.findMany({
       where: {
         name: {
@@ -122,12 +129,12 @@ export class discover_services {
     return brands.map((brand: any) => ({
       id: brand.id,
       name: brand.name,
-      logo_url: brand.logo_url,
-      image: brand.products[0]?.image_url || brand.logo_url,
+      logo_url: toAbsoluteUploadUrl(baseUrl, brand.logo_url),
+      image: toAbsoluteUploadUrl(baseUrl, brand.products[0]?.image_url || brand.logo_url),
     }));
   }
 
-  async filterProducts(gender?: string, family?: string) {
+  async filterProducts(gender?: string, family?: string, baseUrl = "") {
     const where: any = {};
 
     if (gender && gender !== "all") {
@@ -160,21 +167,10 @@ export class discover_services {
       take: 20,
     });
 
-    return products.map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      image: p.image_url,
-      brandId: p.brand.id,
-      brand: p.brand.name,
-      gender: p.gender,
-      family: p.fragrance_family,
-      isFeatured: p.is_featured,
-      isNewArrival: p.is_new_arrival,
-      price: p.sizes[0]?.price || 0,
-    }));
+    return products.map((p: any) => normalizeDiscoverProduct(baseUrl, p));
   }
 
-  async getBrandDetails(brandId: string) {
+  async getBrandDetails(brandId: string, baseUrl = "") {
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
       include: {
@@ -204,21 +200,18 @@ export class discover_services {
     return {
       id: brand.id,
       name: brand.name,
-      logo_url: brand.logo_url,
+      logo_url: toAbsoluteUploadUrl(baseUrl, brand.logo_url),
       productCount: brand.products.length,
       products: brand.products.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        image: p.image_url,
-        gender: p.gender,
-        family: p.fragrance_family,
-        isFeatured: p.is_featured,
-        price: p.sizes[0]?.price || 0,
+        ...normalizeDiscoverProduct(baseUrl, {
+          ...p,
+          brand: { id: brand.id, name: brand.name },
+        }),
       })),
     };
   }
 
-  async getPopularHouses() {
+  async getPopularHouses(baseUrl = "") {
     const brands = await prisma.brand.findMany({
       include: {
         _count: {
@@ -249,15 +242,14 @@ export class discover_services {
     return brands.map((brand: any) => ({
       id: brand.id,
       name: brand.name,
-      logo_url: brand.logo_url,
+      logo_url: toAbsoluteUploadUrl(baseUrl, brand.logo_url),
       productCount: brand._count.products,
-      products: brand.products.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        image: p.image_url,
-        isFeatured: p.is_featured,
-        price: p.sizes[0]?.price || 0,
-      })),
+      products: brand.products.map((p: any) =>
+        normalizeDiscoverProduct(baseUrl, {
+          ...p,
+          brand: { id: brand.id, name: brand.name },
+        })
+      ),
     }));
   }
 }

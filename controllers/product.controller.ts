@@ -9,6 +9,7 @@ const productService = new product_services() ;
 export const getProducts = async (req : Request , res : Response) => {
 
     try {
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
         const {brand_id, gender, fragrance_family, search, is_new_arrival, page, limit} = req.query ;
 
         let isNewArrival: boolean | undefined;
@@ -24,7 +25,7 @@ export const getProducts = async (req : Request , res : Response) => {
             search : search as string ,
             page : parseInt(page as string) || 1 ,
             limit : parseInt(limit as string) || 10
-        });
+        }, baseUrl);
 
        res.status(200).json(products) ;
 
@@ -37,9 +38,10 @@ export const getProducts = async (req : Request , res : Response) => {
 export const getProductById = async (req : any , res : Response) => {
 
     try {
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
         const  id : string = req.params.id ;
 
-        const product = await productService.getProductByIdService(id) ;
+        const product = await productService.getProductByIdService(id , baseUrl) ;
         res.status(200).json(product) ;
     }
     catch (error : any) {
@@ -51,8 +53,9 @@ export const getProductById = async (req : any , res : Response) => {
 export const createProduct = async (req : any , res : Response) => {
 
     try {
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
         const productData = req.body ;
-        const product = await productService.createProductService(productData) ;
+        const product = await productService.createProductService(productData , baseUrl) ;
         res.status(201).json(product) ;
     }
     catch (error : any) {
@@ -63,9 +66,10 @@ export const createProduct = async (req : any , res : Response) => {
 export const updateProduct = async (req : any , res : Response) => {
 
     try {
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
         const product_id = req.params.id ;
         const data = req.body ;
-        const updatedProduct = await productService.updateProductService(product_id , data) ;
+        const updatedProduct = await productService.updateProductService(product_id , data , baseUrl) ;
         res.status(200).json(updatedProduct) ;
     }
     catch (error : any) {
@@ -75,6 +79,7 @@ export const updateProduct = async (req : any , res : Response) => {
 
 export const uploadProductImageById = async (req: any, res: Response) => {
     try {
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
         const product_id = req.params.id;
 
         if (!req.file) {
@@ -83,7 +88,7 @@ export const uploadProductImageById = async (req: any, res: Response) => {
         }
 
         const image_url = toPublicUploadPath(req.file.path);
-        const updatedProduct = await productService.updateProductImageService(product_id, image_url);
+        const updatedProduct = await productService.updateProductImageService(product_id, image_url, baseUrl);
         res.status(200).json(updatedProduct);
     }
     catch (error: any) {
@@ -99,6 +104,7 @@ export const uploadProductImageById = async (req: any, res: Response) => {
 
 export const addBrandLogoImage = async (req: any, res: Response) => {
     try {
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
         const brand_id = req.params.brand_id;
 
         if (!req.file) {
@@ -107,7 +113,7 @@ export const addBrandLogoImage = async (req: any, res: Response) => {
         }
 
         const logo_url = toPublicUploadPath(req.file.path);
-        const brand = await productService.updateBrandLogoService(brand_id, logo_url);
+        const brand = await productService.updateBrandLogoService(brand_id, logo_url, baseUrl);
         res.status(200).json(brand);
     }
     catch (error: any) {

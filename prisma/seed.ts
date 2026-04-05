@@ -292,6 +292,25 @@ async function main(): Promise<void> {
         { size: "100ml", price: 190, stock: 26 },
       ],
     },
+    {
+      key: "crimsonEclipse",
+      brand_id: noir.id,
+      name: "Crimson Eclipse",
+      description: "A dark red scent of saffron, black rose, and smoked amber.",
+      story: "Inspired by a red moon hanging over a quiet midnight skyline.",
+      image_url: "/uploads/products/crimson-eclipse.png",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.oriental,
+      top_notes: "Saffron, Pink Pepper",
+      middle_notes: "Black Rose, Incense",
+      base_notes: "Oud, Amber, Vanilla",
+      is_featured: true,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 180, stock: 32 },
+        { size: "100ml", price: 275, stock: 18 },
+      ],
+    },
   ];
 
   const productIds: Record<string, string> = {};

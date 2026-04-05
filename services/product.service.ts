@@ -1,5 +1,41 @@
 import {prisma} from "../model/prisma" ;
-import { deleteLocalUploadIfExists } from "../utils/uploadFile";
+import { deleteLocalUploadIfExists, toAbsoluteUploadUrl } from "../utils/uploadFile";
+
+const normalizeBrand = (baseUrl: string, brand?: { id: string; name: string; logo_url?: string | null } | null) => {
+    if (!brand) {
+        return brand;
+    }
+
+    return {
+        ...brand,
+        logo_url: toAbsoluteUploadUrl(baseUrl, brand.logo_url),
+    };
+};
+
+const normalizeReview = (baseUrl: string, review: any) => {
+    if (!review) {
+        return review;
+    }
+
+    return {
+        ...review,
+        user: review.user
+            ? {
+                  ...review.user,
+                  avatar_url: toAbsoluteUploadUrl(baseUrl, review.user.avatar_url),
+              }
+            : review.user,
+    };
+};
+
+const normalizeProduct = (baseUrl: string, product: any) => ({
+    ...product,
+    image_url: toAbsoluteUploadUrl(baseUrl, product.image_url),
+    brand: normalizeBrand(baseUrl, product.brand),
+    reviews: Array.isArray(product.reviews)
+        ? product.reviews.map((review: any) => normalizeReview(baseUrl, review))
+        : product.reviews,
+});
 
 export class product_services {
     constructor(){} 
@@ -13,7 +49,7 @@ export class product_services {
         search? : string ,
         page? : number ,
         limit? : number
-    }){
+    }, baseUrl = ""){
 
         const { brand_id , gender , fragrance_family , is_new_arrival, search , page = 1 , limit = 10 } = fillters ;
 
@@ -46,13 +82,15 @@ export class product_services {
             prisma.product.count({ where })
         ]);
 
-        const productsWithRating = products.map((p) => ({
-            ...p ,
+        const normalizedProducts = products.map((product: any) => normalizeProduct(baseUrl, product));
+
+        const productsWithRating = normalizedProducts.map((product: any) => ({
+            ...product ,
             avg_rating : 
-                p.reviews.length > 0
-                    ? p.reviews.reduce((sum , r) => sum + r.rating , 0) / p.reviews.length
+                product.reviews.length > 0
+                    ? product.reviews.reduce((sum: number , r: any) => sum + r.rating , 0) / product.reviews.length
                     : 0,
-            reviews_count : p.reviews.length,
+            reviews_count : product.reviews.length,
             reviews : undefined
         }));
 
@@ -68,7 +106,7 @@ export class product_services {
     }
 
     // getProductById
-    async getProductByIdService (id : string) {
+    async getProductByIdService (id : string , baseUrl = "") {
 
         const product = await prisma.product.findUnique({
             where : { id : id},
@@ -86,14 +124,15 @@ export class product_services {
 
         if(!product) throw new Error("Product not found") ;
 
-        const avg_rating = product.reviews.length > 0
-            ? product.reviews.reduce((sum , r) => sum + r.rating , 0) / product.reviews.length
+        const normalizedProduct = normalizeProduct(baseUrl, product);
+        const avg_rating = normalizedProduct.reviews.length > 0
+            ? normalizedProduct.reviews.reduce((sum: number , r: any) => sum + r.rating , 0) / normalizedProduct.reviews.length
             : 0;
         
         return {
-            ...product ,
+            ...normalizedProduct ,
             avg_rating ,
-            reviews_count : product.reviews.length
+            reviews_count : normalizedProduct.reviews.length
         }
     }
 
@@ -112,7 +151,7 @@ export class product_services {
         is_featured?: boolean;
         is_new_arrival?: boolean;
         sizes: { size: string; price: number; stock: number }[];
-    }) {
+    }, baseUrl = "") {
 
         const {sizes , ...productData} = data ;
 
@@ -126,12 +165,12 @@ export class product_services {
                 }
             },
             include : {
-                brand : { select : { id : true , name : true}},
+                brand : { select : { id : true , name : true , logo_url : true }},
                 sizes : true
             }
         });
 
-        return product ;    
+        return normalizeProduct(baseUrl, product) ;    
     }
 
     // updateProduct
@@ -147,7 +186,7 @@ export class product_services {
         base_notes?: string;
         is_featured?: boolean;
         is_new_arrival?: boolean;
-    }) {
+    }, baseUrl = "") {
         const existingProduct = await prisma.product.findUnique({
             where: { id: product_id },
             select: { id: true, image_url: true },
@@ -165,7 +204,7 @@ export class product_services {
                 fragrance_family : data.fragrance_family as any
             },
             include : {
-                brand: { select: { id: true, name: true } },
+                brand: { select: { id: true, name: true, logo_url: true } },
                 sizes: true,
             }        
         });
@@ -178,10 +217,10 @@ export class product_services {
             await deleteLocalUploadIfExists(existingProduct.image_url);
         }
 
-        return product ;
+        return normalizeProduct(baseUrl, product) ;
     }
 
-    async updateProductImageService(product_id: string, image_url: string) {
+    async updateProductImageService(product_id: string, image_url: string , baseUrl = "") {
         const existingProduct = await prisma.product.findUnique({
             where: { id: product_id },
             select: { id: true, image_url: true },
@@ -195,7 +234,7 @@ export class product_services {
             where: { id: product_id },
             data: { image_url },
             include: {
-                brand: { select: { id: true, name: true } },
+                brand: { select: { id: true, name: true, logo_url: true } },
                 sizes: true,
             },
         });
@@ -204,10 +243,10 @@ export class product_services {
             await deleteLocalUploadIfExists(existingProduct.image_url);
         }
 
-        return product;
+        return normalizeProduct(baseUrl, product);
     }
 
-    async updateBrandLogoService(brand_id: string, logo_url: string) {
+    async updateBrandLogoService(brand_id: string, logo_url: string , baseUrl = "") {
         const existingBrand = await prisma.brand.findUnique({
             where: { id: brand_id },
             select: { id: true, logo_url: true },
@@ -227,7 +266,7 @@ export class product_services {
             await deleteLocalUploadIfExists(existingBrand.logo_url);
         }
 
-        return brand;
+        return normalizeBrand(baseUrl, brand);
     }
 
     // deleteProduct

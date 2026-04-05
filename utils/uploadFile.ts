@@ -19,6 +19,24 @@ export const toPublicUploadPath = (filePath: string) => {
     return normalized;
 };
 
+export const toAbsoluteUploadUrl = (baseUrl: string, storedPath?: string | null) => {
+    const value = (storedPath ?? "").trim();
+
+    if (!value) {
+        return "";
+    }
+
+    if (value.startsWith("http://") || value.startsWith("https://")) {
+        return value;
+    }
+
+    if (value.startsWith("/")) {
+        return `${baseUrl}${value}`;
+    }
+
+    return `${baseUrl}/${value}`;
+};
+
 export const deleteLocalUploadIfExists = async (storedPath?: string | null) => {
     if (!storedPath || !storedPath.startsWith("/uploads/")) {
         return;
