@@ -32,7 +32,10 @@ export class address_services {
         state: string;
         zip_code: string;
         country: string;
-        is_default?: boolean;}){
+        is_default?: boolean;
+        latitude?: number;
+        longitude?: number;
+    }){
 
         if(data.is_default){
             await prisma.address.updateMany({
@@ -63,6 +66,8 @@ export class address_services {
         zip_code?: string;
         country?: string;
         is_default?: boolean;
+        latitude?: number;
+        longitude?: number;
     }){
 
         const address = await prisma.address.findFirst({

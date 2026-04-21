@@ -37,7 +37,7 @@ export class auth_services {
     async registerService (full_name : string , email : string , password : string){
         const normalizedEmail = email.trim().toLowerCase();
 
-        const existingUser = await prisma.user.findUnique({
+        const existingUser = await prisma.user.findFirst({
             where : {
                 email : normalizedEmail
             },
@@ -84,17 +84,9 @@ export class auth_services {
     async loginService (email : string , password : string){
         const normalizedEmail = email.trim().toLowerCase();
 
-        const user = await prisma.user.findUnique({
+        const user = await prisma.user.findFirst({
             where : {
                 email : normalizedEmail
-            },
-            select : {
-                id: true,
-                full_name: true,
-                email: true,
-                password_hash: true,
-                role: true,
-                is_email_verified: true,
             }
         });
 
@@ -112,13 +104,18 @@ export class auth_services {
             throw new Error("EMAIL_NOT_VERIFIED");
         }
 
+        const jwtSecret = process.env.JWT_SECRET;
+        if (!jwtSecret) {
+            throw new Error("JWT_SECRET is missing");
+        }
+
         const token = jwt.sign(
             {
                 userId : user.id,
                 email: user.email,
                 role : user.role
             },
-            process.env.JWT_SECRET!,
+            jwtSecret,
             {
                 expiresIn : "7d"
             }
@@ -140,17 +137,9 @@ export class auth_services {
         const normalizedEmail = email.trim().toLowerCase();
         const normalizedCode = code.trim();
 
-        const user = await prisma.user.findUnique({
+        const user = await prisma.user.findFirst({
             where: {
                 email: normalizedEmail,
-            },
-            select: {
-                id: true,
-                email: true,
-                is_email_verified: true,
-                email_verification_code_hash: true,
-                email_verification_code_expires_at: true,
-                email_verification_sent_at: true,
             },
         });
 
@@ -193,17 +182,9 @@ export class auth_services {
     async resendVerificationService(email: string) {
         const normalizedEmail = email.trim().toLowerCase();
 
-        const user = await prisma.user.findUnique({
+        const user = await prisma.user.findFirst({
             where: {
                 email: normalizedEmail,
-            },
-            select: {
-                id: true,
-                email: true,
-                is_email_verified: true,
-                email_verification_code_hash: true,
-                email_verification_code_expires_at: true,
-                email_verification_sent_at: true,
             },
         });
 

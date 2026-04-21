@@ -1,11 +1,18 @@
 import bcrypt from "bcryptjs";
-import { FragranceFamily, Gender, OrderStatus, Role } from "@prisma/client";
+import {
+  DeliveryMessageSender,
+  FragranceFamily,
+  Gender,
+  OrderStatus,
+  Role,
+} from "@prisma/client";
 import { prisma } from "../model/prisma";
 
 //run using npx prisma db seed
 // admin@scentra.dev / Admin@12345
 // sara@scentra.dev / Customer@12345
 // omar@scentra.dev / Customer@12345
+// delivery@scentra.dev / Delivery@12345
 
 type ProductSeed = {
   key: string;
@@ -24,7 +31,23 @@ type ProductSeed = {
   sizes: Array<{ size: string; price: number; stock: number }>;
 };
 
+async function ensureDatabaseReachable(): Promise<void> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  }
+  catch (error: any) {
+    if (error?.code === "ECONNREFUSED") {
+      throw new Error(
+        "Database is unreachable (ECONNREFUSED). Start PostgreSQL or update DATABASE_URL in scentra-backend/.env.",
+      );
+    }
+
+    throw error;
+  }
+}
+
 async function clearDatabase(): Promise<void> {
+  await prisma.deliveryMessage.deleteMany();
   await prisma.review.deleteMany();
   await prisma.wishlistItem.deleteMany();
   await prisma.cartItem.deleteMany();
@@ -42,10 +65,12 @@ async function clearDatabase(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  await ensureDatabaseReachable();
   await clearDatabase();
 
   const adminPassword = await bcrypt.hash("Admin@12345", 10);
   const customerPassword = await bcrypt.hash("Customer@12345", 10);
+  const deliveryPassword = await bcrypt.hash("Delivery@12345", 10);
 
   const admin = await prisma.user.create({
     data: {
@@ -83,11 +108,24 @@ async function main(): Promise<void> {
     },
   });
 
+  const deliveryPerson = await prisma.user.create({
+    data: {
+      full_name: "Delivery Rider",
+      email: "delivery@scentra.dev",
+      password_hash: deliveryPassword,
+      role: "delivery_person" as any,
+      is_email_verified: true,
+      points: 0,
+      phone: "+201000000004",
+    },
+  });
+
   await prisma.cart.createMany({
     data: [
       { user_id: admin.id },
       { user_id: customer.id },
       { user_id: customerTwo.id },
+      { user_id: deliveryPerson.id },
     ],
   });
 
@@ -96,6 +134,7 @@ async function main(): Promise<void> {
       { user_id: admin.id },
       { user_id: customer.id },
       { user_id: customerTwo.id },
+      { user_id: deliveryPerson.id },
     ],
   });
 
@@ -366,6 +405,8 @@ async function main(): Promise<void> {
       zip_code: "11511",
       country: "Egypt",
       is_default: true,
+      latitude: 30.0444,
+      longitude: 31.2357,
     },
   });
 
@@ -379,6 +420,8 @@ async function main(): Promise<void> {
       zip_code: "11835",
       country: "Egypt",
       is_default: false,
+      latitude: 30.0611,
+      longitude: 31.2501,
     },
   });
 
@@ -392,6 +435,8 @@ async function main(): Promise<void> {
       zip_code: "21519",
       country: "Egypt",
       is_default: true,
+      latitude: 31.2001,
+      longitude: 29.9187,
     },
   });
 
@@ -426,7 +471,7 @@ async function main(): Promise<void> {
     ],
   });
 
-  await prisma.order.create({
+  const deliveredOrder = await prisma.order.create({
     data: {
       user_id: customer.id,
       address_id: customerMainAddress.id,
@@ -443,7 +488,7 @@ async function main(): Promise<void> {
     },
   });
 
-  await prisma.order.create({
+  const inProgressOrder = await prisma.order.create({
     data: {
       user_id: customerTwo.id,
       address_id: customerTwoAddress.id,
@@ -451,10 +496,45 @@ async function main(): Promise<void> {
       total_price: 102.6,
       payment_method: "mastercard",
       delivery_method: "standard",
+      delivery_person_id: deliveryPerson.id,
+      assigned_at: new Date(),
+      delivery_location_updated_at: new Date(),
+      delivery_latitude: 31.2058,
+      delivery_longitude: 29.9245,
       order_items: {
         create: [{ product_id: productIds.citrusDrift, quantity: 1, price: 95, size: "50ml" }],
       },
     },
+  });
+
+  await prisma.deliveryMessage.createMany({
+    data: [
+      {
+        order_id: deliveredOrder.id,
+        sender: DeliveryMessageSender.system,
+        message: "Order placed successfully.",
+      },
+      {
+        order_id: deliveredOrder.id,
+        sender: DeliveryMessageSender.delivery,
+        message: "Your rider picked up the package.",
+      },
+      {
+        order_id: deliveredOrder.id,
+        sender: DeliveryMessageSender.customer,
+        message: "Thanks, I received it.",
+      },
+      {
+        order_id: inProgressOrder.id,
+        sender: DeliveryMessageSender.system,
+        message: "Order placed successfully.",
+      },
+      {
+        order_id: inProgressOrder.id,
+        sender: DeliveryMessageSender.delivery,
+        message: "I am on my way, ETA 20 minutes.",
+      },
+    ],
   });
 
   await prisma.review.createMany({

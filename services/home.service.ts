@@ -18,50 +18,42 @@ export class home_services {
         };
 
          // Banners
-        const banners = await prisma.banner.findMany({
-            include : {
-                product :{
-                    select : {
-                        id : true,
-                        name : true,
-                        image_url : true,
-                },
-            },
-        }
-        });
+        const banners = await prisma.banner.findMany({ take: 5 }).catch(() => []);
 
          // New Arrivals
         const products = await prisma.product.findMany({
-            orderBy : {
-                created_at : "desc"
-            },
-            include : {
-                brand : {
-                    select : {
-                        name : true
-                    }
-                },
-                sizes : {
-                    select : {
-                        size : true,
-                        price : true,
+            take: 10,
+            orderBy: [
+                { is_new_arrival: 'desc' },
+                { created_at: 'desc' },
+            ],
+            include: {
+                brand: {
+                    select: {
+                        name: true,
                     },
-                    orderBy : {
-                        price : "asc"
-                    }
-                }
-            }
-        });
+                },
+                sizes: {
+                    where: {
+                        stock: {
+                            gt: 0,
+                        },
+                    },
+                    select: {
+                        size: true,
+                        price: true,
+                        stock: true,
+                    },
+                    orderBy: {
+                        price: 'asc',
+                    },
+                },
+            },
+        }).catch(() => []);
 
         const normalizedBanners = banners.map((banner) => ({
             ...banner,
             image_url: toAbsoluteUrl(banner.image_url),
-            product: banner.product
-                ? {
-                      ...banner.product,
-                      image_url: toAbsoluteUrl(banner.product.image_url),
-                  }
-                : null,
         }));
 
         const normalizedProducts = products.map((product) => ({

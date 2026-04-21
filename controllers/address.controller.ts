@@ -19,7 +19,20 @@ export const addAddress = async (req : any , res : Response) => {
 
     try {
         const userId = req.user.userId ;
-        const { label, street, city, state, zip_code, country, is_default } = req.body;
+        const {
+            label,
+            street,
+            city,
+            state,
+            zip_code,
+            country,
+            is_default,
+            latitude,
+            longitude,
+        } = req.body;
+
+        const parsedLatitude = latitude === undefined ? undefined : Number(latitude);
+        const parsedLongitude = longitude === undefined ? undefined : Number(longitude);
 
         if(!label || !street || !city || !state || !zip_code || !country){
             res.status(400).json({
@@ -28,8 +41,26 @@ export const addAddress = async (req : any , res : Response) => {
             return;
         }
 
+        if(
+            (parsedLatitude !== undefined && Number.isNaN(parsedLatitude)) ||
+            (parsedLongitude !== undefined && Number.isNaN(parsedLongitude))
+        ){
+            res.status(400).json({
+                msg : "Latitude and longitude must be valid numbers"
+            });
+            return;
+        }
+
         const newAddress = await addressService.addAddressService(userId , {
-            label, street, city, state, zip_code, country, is_default
+            label,
+            street,
+            city,
+            state,
+            zip_code,
+            country,
+            is_default,
+            latitude: parsedLatitude,
+            longitude: parsedLongitude,
         }); ;
         res.status(201).json(newAddress);
     } 
@@ -43,7 +74,25 @@ export const updateAddress = async (req : any , res : Response) => {
     try {
         const userId = req.user.userId ;
         const  addressId = req.params.id ;
-        const data = req.body ;
+        const data = { ...req.body } ;
+
+        if(data.latitude !== undefined){
+            data.latitude = Number(data.latitude);
+        }
+
+        if(data.longitude !== undefined){
+            data.longitude = Number(data.longitude);
+        }
+
+        if(
+            (data.latitude !== undefined && Number.isNaN(data.latitude)) ||
+            (data.longitude !== undefined && Number.isNaN(data.longitude))
+        ){
+            res.status(400).json({
+                msg : "Latitude and longitude must be valid numbers"
+            });
+            return;
+        }
 
         const updatedAddress = await addressService.updateAddressService(userId , addressId , data) ;
         res.status(200).json(updatedAddress);
