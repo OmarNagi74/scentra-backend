@@ -1,6 +1,25 @@
 import {prisma} from "../model/prisma" ;
 import { deleteLocalUploadIfExists, toAbsoluteUploadUrl } from "../utils/uploadFile";
 
+export class ProductServiceError extends Error {
+    statusCode: number;
+
+    constructor(statusCode: number, message: string) {
+        super(message);
+        this.statusCode = statusCode;
+    }
+}
+
+const ALLOWED_GENDERS = new Set(["male", "female", "unisex"]);
+const ALLOWED_FRAGRANCE_FAMILIES = new Set([
+    "floral",
+    "woody",
+    "oriental",
+    "fresh",
+    "citrus",
+    "aquatic",
+]);
+
 const normalizeBrand = (baseUrl: string, brand?: { id: string; name: string; logo_url?: string | null } | null) => {
     if (!brand) {
         return brand;
@@ -152,16 +171,87 @@ export class product_services {
         is_new_arrival?: boolean;
         sizes: { size: string; price: number; stock: number }[];
     }, baseUrl = "") {
+        const brandId = typeof data.brand_id === "string" ? data.brand_id.trim() : "";
+        const name = typeof data.name === "string" ? data.name.trim() : "";
+        const gender = typeof data.gender === "string" ? data.gender.trim().toLowerCase() : "";
+        const fragranceFamily = typeof data.fragrance_family === "string"
+            ? data.fragrance_family.trim().toLowerCase()
+            : "";
+
+        if (!brandId) {
+            throw new ProductServiceError(400, "brand_id is required");
+        }
+
+        if (!name) {
+            throw new ProductServiceError(400, "name is required");
+        }
+
+        if (!ALLOWED_GENDERS.has(gender)) {
+            throw new ProductServiceError(400, "Invalid gender");
+        }
+
+        if (!ALLOWED_FRAGRANCE_FAMILIES.has(fragranceFamily)) {
+            throw new ProductServiceError(400, "Invalid fragrance_family");
+        }
+
+        if (!Array.isArray(data.sizes) || data.sizes.length === 0) {
+            throw new ProductServiceError(400, "At least one size is required");
+        }
+
+        const normalizedSizes = data.sizes.map((entry) => {
+            const size = typeof entry.size === "string" ? entry.size.trim() : "";
+            const price = Number(entry.price);
+            const stock = Number(entry.stock);
+
+            if (!size) {
+                throw new ProductServiceError(400, "Each size requires a non-empty size value");
+            }
+
+            if (!Number.isFinite(price) || price <= 0) {
+                throw new ProductServiceError(400, `Invalid price for size ${size}`);
+            }
+
+            if (!Number.isFinite(stock) || stock < 0) {
+                throw new ProductServiceError(400, `Invalid stock for size ${size}`);
+            }
+
+            return {
+                size,
+                price,
+                stock: Math.floor(stock),
+            };
+        });
+
+        const sizeKeys = new Set<string>();
+        for (const size of normalizedSizes) {
+            const key = size.size.toLowerCase();
+            if (sizeKeys.has(key)) {
+                throw new ProductServiceError(400, `Duplicate size value: ${size.size}`);
+            }
+            sizeKeys.add(key);
+        }
+
+        const existingBrand = await prisma.brand.findUnique({
+            where: { id: brandId },
+            select: { id: true },
+        });
+
+        if (!existingBrand) {
+            throw new ProductServiceError(404, "Brand not found");
+        }
 
         const {sizes , ...productData} = data ;
+        void sizes;
 
         const product = await prisma.product.create({
             data : {
                 ...productData,
-                gender : productData.gender as any ,
-                fragrance_family : productData.fragrance_family as any ,
+                brand_id: brandId,
+                name,
+                gender : gender as any ,
+                fragrance_family : fragranceFamily as any ,
                 sizes : {
-                    create : sizes
+                    create : normalizedSizes
                 }
             },
             include : {

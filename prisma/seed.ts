@@ -1,12 +1,47 @@
 import bcrypt from "bcryptjs";
-import {
-  DeliveryMessageSender,
-  FragranceFamily,
-  Gender,
-  OrderStatus,
-  Role,
-} from "@prisma/client";
 import { prisma } from "../model/prisma";
+
+const DeliveryMessageSender = {
+  customer: "customer",
+  delivery: "delivery",
+  system: "system",
+} as const;
+type DeliveryMessageSender =
+  (typeof DeliveryMessageSender)[keyof typeof DeliveryMessageSender];
+
+const FragranceFamily = {
+  floral: "floral",
+  woody: "woody",
+  oriental: "oriental",
+  fresh: "fresh",
+  citrus: "citrus",
+  aquatic: "aquatic",
+} as const;
+type FragranceFamily =
+  (typeof FragranceFamily)[keyof typeof FragranceFamily];
+
+const Gender = {
+  male: "male",
+  female: "female",
+  unisex: "unisex",
+} as const;
+type Gender = (typeof Gender)[keyof typeof Gender];
+
+const OrderStatus = {
+  pending: "pending",
+  paid: "paid",
+  shipped: "shipped",
+  delivered: "delivered",
+  cancelled: "cancelled",
+} as const;
+type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
+
+const Role = {
+  admin: "admin",
+  customer: "customer",
+  delivery_person: "delivery_person",
+} as const;
+type Role = (typeof Role)[keyof typeof Role];
 
 //run using npx prisma db seed
 // admin@scentra.dev / Admin@12345
@@ -113,7 +148,7 @@ async function main(): Promise<void> {
       full_name: "Delivery Rider",
       email: "delivery@scentra.dev",
       password_hash: deliveryPassword,
-      role: "delivery_person" as any,
+      role: Role.delivery_person,
       is_email_verified: true,
       points: 0,
       phone: "+201000000004",

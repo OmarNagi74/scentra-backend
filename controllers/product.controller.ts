@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { Request , Response } from "express";
 import multer from "multer";
-import { product_services } from "../services/product.service";
+import { ProductServiceError, product_services } from "../services/product.service";
 import { toPublicUploadPath } from "../utils/uploadFile";
 
 const productService = new product_services() ;
@@ -59,7 +59,26 @@ export const createProduct = async (req : any , res : Response) => {
         res.status(201).json(product) ;
     }
     catch (error : any) {
-        res.status(500).json({ error : error.message }) ;
+        const message = (error?.message ?? "Failed to create product").toString();
+
+        if (error instanceof ProductServiceError) {
+            res.status(error.statusCode).json({ error: message });
+            return;
+        }
+
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            if (error.code === "P2002") {
+                res.status(409).json({ error: "A product with the same unique values already exists" });
+                return;
+            }
+
+            if (error.code === "P2003") {
+                res.status(400).json({ error: "Invalid relation reference in create payload" });
+                return;
+            }
+        }
+
+        res.status(500).json({ error : message }) ;
     }
 }
 
