@@ -3,6 +3,60 @@ import {prisma} from "../model/prisma";
 export class order_services {
     constructor(){}
 
+    private scheduleAutoPaymentConfirmation(orderId: string) {
+        setTimeout(async () => {
+            try {
+                await this.confirmPaymentForOrderService(orderId, { source: 'auto-simulation' });
+            }
+            catch (err) {
+                console.error('Failed to auto-confirm payment for order:', orderId, err);
+            }
+        }, 5_000);
+    }
+
+    async confirmPaymentForOrderService(
+        orderId: string,
+        options?: {
+            source?: 'auto-simulation' | 'gateway-callback';
+            transactionId?: string;
+        },
+    ) {
+        // Extension point: integrate real gateway verification and transaction persistence here.
+        const updated = await prisma.$transaction(async (tx) => {
+            const updateResult = await tx.order.updateMany({
+                where: {
+                    id: orderId,
+                    status: 'pending',
+                },
+                data: {
+                    status: 'paid',
+                },
+            });
+
+            if (updateResult.count === 0) {
+                return null;
+            }
+
+            await tx.deliveryMessage.create({
+                data: {
+                    order_id: orderId,
+                    sender: 'system',
+                    message: options?.source === 'gateway-callback'
+                        ? 'Payment confirmed. Your order is now being prepared for shipment.'
+                        : 'Payment simulated and confirmed. Your order is now being prepared for shipment.',
+                },
+            });
+
+            return tx.order.findUnique({
+                where: {
+                    id: orderId,
+                },
+            });
+        });
+
+        return updated;
+    }
+
     async placeOrderService (userId : string , addressId : string , delivery_method : string , payment_method : string){
 
         const cart = await prisma.cart.findUnique({
@@ -47,7 +101,7 @@ export class order_services {
 
         const points_earned = Math.floor(subtotal / 10) ; // 1 point per $10 spent
 
-        return prisma.$transaction(async (tx) => {
+        const placedOrder = await prisma.$transaction(async (tx) => {
             for (const it of cart.cart_items) {
                 const sizeStockUpdate = await tx.productSize.updateMany({
                     where: {
@@ -147,6 +201,10 @@ export class order_services {
                 points: updatedUser.points,
             };
         });
+
+        this.scheduleAutoPaymentConfirmation(placedOrder.order.id);
+
+        return placedOrder;
     }
 
     async getOrderHistoryService (userId : string){
@@ -399,6 +457,12 @@ export class order_services {
                 updated_at : 'desc'
             },
             include : {
+                user : {
+                    select : {
+                        full_name : true,
+                        phone : true
+                    }
+                },
                 address : true,
                 order_items : {
                     include : {
@@ -441,6 +505,7 @@ export class order_services {
                     id : orderId
                 },
                 data : {
+                    status : 'shipped',
                     delivery_person_id : userId,
                     assigned_at : new Date(),
                     delivery_location_updated_at : new Date()
@@ -470,7 +535,7 @@ export class order_services {
                 data : {
                     order_id : orderId,
                     sender : 'system',
-                    message : 'Order assigned to delivery partner.'
+                    message : 'Order claimed by delivery partner and marked as shipped.'
                 }
             });
 
@@ -567,5 +632,103 @@ export class order_services {
                 message
             }
         });
+    }
+
+    private async markMessagesSeenByRoleService(
+        orderId: string,
+        reader: 'customer' | 'delivery',
+        messageIds: string[],
+    ) {
+        if (messageIds.length === 0) {
+            return {
+                updatedCount: 0,
+                messages: [],
+            };
+        }
+
+        const oppositeSender = reader === 'customer' ? 'delivery' : 'customer';
+
+        const result = await prisma.deliveryMessage.updateMany({
+            where: {
+                id: {
+                    in: messageIds,
+                },
+                order_id: orderId,
+                sender: oppositeSender,
+                read_at: null,
+            },
+            data: {
+                read_at: new Date(),
+            },
+        });
+
+        const messages = await prisma.deliveryMessage.findMany({
+            where: {
+                id: {
+                    in: messageIds,
+                },
+                order_id: orderId,
+                sender: oppositeSender,
+            },
+            orderBy: {
+                created_at: 'asc',
+            },
+        });
+
+        return {
+            updatedCount: result.count,
+            messages,
+        };
+    }
+
+    async markDeliveryMessagesSeenAsCustomerService(
+        userId: string,
+        orderId: string,
+        messageIds: string[],
+    ) {
+        const order = await prisma.order.findFirst({
+            where: {
+                id: orderId,
+                user_id: userId,
+            },
+        });
+
+        if (!order) {
+            throw new Error('Order not found');
+        }
+
+        return this.markMessagesSeenByRoleService(orderId, 'customer', messageIds);
+    }
+
+    async markDeliveryMessagesSeenAsDeliveryService(
+        userId: string,
+        orderId: string,
+        messageIds: string[],
+    ) {
+        const order = await prisma.order.findFirst({
+            where: {
+                id: orderId,
+                delivery_person_id: userId,
+            },
+        });
+
+        if (!order) {
+            throw new Error('Order not found');
+        }
+
+        return this.markMessagesSeenByRoleService(orderId, 'delivery', messageIds);
+    }
+
+    async markDeliveryMessageSeenFromSocketService(
+        orderId: string,
+        reader: string,
+        messageId: string,
+    ) {
+        if (reader !== 'customer' && reader !== 'delivery') {
+            return null;
+        }
+
+        const result = await this.markMessagesSeenByRoleService(orderId, reader, [messageId]);
+        return result.messages.length > 0 ? result.messages[0] : null;
     }
 }

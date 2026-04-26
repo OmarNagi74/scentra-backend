@@ -1,6 +1,6 @@
 import { Request , Response } from "express";
 import { order_services } from "../services/order.service";
-import { emitDeliveryMessage } from "../realtime/socket";
+import { emitDeliveryMessage, emitDeliveryRead } from "../realtime/socket";
 
 const orderService = new order_services() ;
 
@@ -128,6 +128,41 @@ export const markOrderCancelled = async (req : any , res : Response) => {
     catch(err : any){
         res.status(500).json({
             msg : err.message
+        });
+    }
+}
+
+export const markDeliveryMessagesSeen = async (req: any, res: Response) => {
+
+    try {
+        const userId = req.user.userId;
+        const orderId = req.params.orderId;
+        const messageIdsInput = Array.isArray(req.body?.messageIds) ? req.body.messageIds : [];
+        const messageIds = messageIdsInput
+            .map((id: unknown) => (typeof id === 'string' ? id.trim() : ''))
+            .filter((id: string) => id.length > 0);
+
+        const result = await orderService.markDeliveryMessagesSeenAsCustomerService(
+            userId,
+            orderId,
+            messageIds,
+        );
+
+        for (const message of result.messages) {
+            if (!message.read_at) continue;
+            emitDeliveryRead(orderId, {
+                orderId,
+                reader: 'customer',
+                messageId: message.id,
+                readAt: message.read_at,
+            });
+        }
+
+        res.status(200).json(result);
+    }
+    catch (err: any) {
+        res.status(500).json({
+            msg: err.message,
         });
     }
 }

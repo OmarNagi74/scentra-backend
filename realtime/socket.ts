@@ -1,7 +1,9 @@
 import { Server as HttpServer } from "http";
 import { Server } from "socket.io";
+import { order_services } from "../services/order.service";
 
 let io: Server | null = null;
+const orderService = new order_services();
 
 const roomName = (orderId: string) => `order:${orderId}`;
 
@@ -74,7 +76,30 @@ export function initSocket(server: HttpServer): Server {
       if (!isValidReadPayload(payload)) {
         return;
       }
-      socket.to(roomName(payload.orderId)).emit("delivery:read", payload);
+
+      const messageId = payload.messageId?.trim();
+      if (!messageId) {
+        return;
+      }
+
+      void orderService
+        .markDeliveryMessageSeenFromSocketService(
+          payload.orderId,
+          payload.reader,
+          messageId,
+        )
+        .then((updated) => {
+          if (!updated) return;
+          io?.to(roomName(payload.orderId)).emit("delivery:read", {
+            orderId: payload.orderId,
+            reader: payload.reader,
+            messageId: updated.id,
+            readAt: updated.read_at,
+          });
+        })
+        .catch(() => {
+          // Ignore socket persistence failures to keep channel alive.
+        });
     });
   });
 
@@ -87,4 +112,9 @@ export function emitDeliveryMessage(orderId: string, message: unknown): void {
     orderId,
     message,
   });
+}
+
+export function emitDeliveryRead(orderId: string, payload: unknown): void {
+  if (!io) return;
+  io.to(roomName(orderId)).emit("delivery:read", payload);
 }

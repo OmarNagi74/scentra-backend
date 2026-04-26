@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { order_services } from "../services/order.service";
-import { emitDeliveryMessage } from "../realtime/socket";
+import { emitDeliveryMessage, emitDeliveryRead } from "../realtime/socket";
 
 const orderService = new order_services();
 
@@ -96,6 +96,38 @@ export const postDeliveryMessageAsDelivery = async (req: any, res: Response) => 
         emitDeliveryMessage(orderId, newMessage);
 
         res.status(201).json(newMessage);
+    }
+    catch (err: any) {
+        res.status(400).json({ msg: err.message });
+    }
+};
+
+export const markDeliveryMessagesSeenAsDelivery = async (req: any, res: Response) => {
+    try {
+        const userId = req.user.userId;
+        const orderId = req.params.orderId;
+        const messageIdsInput = Array.isArray(req.body?.messageIds) ? req.body.messageIds : [];
+        const messageIds = messageIdsInput
+            .map((id: unknown) => (typeof id === 'string' ? id.trim() : ''))
+            .filter((id: string) => id.length > 0);
+
+        const result = await orderService.markDeliveryMessagesSeenAsDeliveryService(
+            userId,
+            orderId,
+            messageIds,
+        );
+
+        for (const message of result.messages) {
+            if (!message.read_at) continue;
+            emitDeliveryRead(orderId, {
+                orderId,
+                reader: 'delivery',
+                messageId: message.id,
+                readAt: message.read_at,
+            });
+        }
+
+        res.status(200).json(result);
     }
     catch (err: any) {
         res.status(400).json({ msg: err.message });

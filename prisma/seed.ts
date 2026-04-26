@@ -1,4 +1,6 @@
 import bcrypt from "bcryptjs";
+import fs from "fs/promises";
+import path from "path";
 import { prisma } from "../model/prisma";
 
 const DeliveryMessageSender = {
@@ -42,6 +44,82 @@ const Role = {
   delivery_person: "delivery_person",
 } as const;
 type Role = (typeof Role)[keyof typeof Role];
+
+const uploadRoot = path.resolve(__dirname, "..", "uploads");
+const seedImageCache = new Map<string, Promise<string>>();
+
+function sanitizeFileName(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "image"
+  );
+}
+
+function extensionFromContentType(contentType: string): string | null {
+  switch (contentType.split(";")[0].trim().toLowerCase()) {
+    case "image/jpeg":
+      return ".jpg";
+    case "image/png":
+      return ".png";
+    case "image/webp":
+      return ".webp";
+    case "image/gif":
+      return ".gif";
+    case "image/avif":
+      return ".avif";
+    case "image/svg+xml":
+      return ".svg";
+    default:
+      return null;
+  }
+}
+
+async function materializeSeedImage(
+  source: string,
+  folder: string,
+  fileBaseName: string,
+): Promise<string> {
+  if (source.startsWith("/uploads/")) {
+    return source;
+  }
+
+  const cacheKey = `${folder}:${source}`;
+  const cachedPath = seedImageCache.get(cacheKey);
+  if (cachedPath) {
+    return cachedPath;
+  }
+
+  const promise = (async () => {
+    const destinationDirectory = path.join(uploadRoot, folder);
+    await fs.mkdir(destinationDirectory, { recursive: true });
+
+    const response = await fetch(source);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to download seed image from ${source}: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    const sourceUrl = new URL(source);
+    const extension =
+      path.extname(sourceUrl.pathname) ||
+      extensionFromContentType(response.headers.get("content-type") ?? "") ||
+      ".jpg";
+
+    const fileName = `${sanitizeFileName(fileBaseName)}${extension}`;
+    const filePath = path.join(destinationDirectory, fileName);
+    const imageBuffer = Buffer.from(await response.arrayBuffer());
+
+    await fs.writeFile(filePath, imageBuffer);
+
+    return `/uploads/${folder}/${fileName}`;
+  })();
+
+  seedImageCache.set(cacheKey, promise);
+  return promise;
+}
 
 //run using npx prisma db seed
 // admin@scentra.dev / Admin@12345
@@ -176,21 +254,33 @@ async function main(): Promise<void> {
   const maison = await prisma.brand.create({
     data: {
       name: "Maison Lumiere",
-      logo_url: "https://images.unsplash.com/photo-1612817288484-6f916006741a",
+      logo_url: await materializeSeedImage(
+        "https://images.unsplash.com/photo-1612817288484-6f916006741a",
+        "brands",
+        "maison-lumiere",
+      ),
     },
   });
 
   const noir = await prisma.brand.create({
     data: {
       name: "Noir Atelier",
-      logo_url: "https://images.unsplash.com/photo-1523293182086-7651a899d37f",
+      logo_url: await materializeSeedImage(
+        "https://images.unsplash.com/photo-1523293182086-7651a899d37f",
+        "brands",
+        "noir-atelier",
+      ),
     },
   });
 
   const aqua = await prisma.brand.create({
     data: {
       name: "Aqua Botanica",
-      logo_url: "https://images.unsplash.com/photo-1541643600914-78b084683601",
+      logo_url: await materializeSeedImage(
+        "https://images.unsplash.com/photo-1541643600914-78b084683601",
+        "brands",
+        "aqua-botanica",
+      ),
     },
   });
 
@@ -367,6 +457,101 @@ async function main(): Promise<void> {
       ],
     },
     {
+      key: "onyxSaffron",
+      brand_id: noir.id,
+      name: "Onyx Saffron",
+      description: "Saffron and dark resin over amber.",
+      story: "An intense oriental profile.",
+      image_url: "https://images.unsplash.com/photo-1588405748880-12d1d2a59f75",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.oriental,
+      top_notes: "Saffron, Clove",
+      middle_notes: "Resin, Rose",
+      base_notes: "Amber, Oud",
+      is_featured: true,
+      is_new_arrival: false,
+      sizes: [
+        { size: "50ml", price: 188, stock: 21 },
+        { size: "100ml", price: 286, stock: 11 },
+      ],
+    },
+    {
+      key: "coldPaper",
+      brand_id: noir.id,
+      name: "Cold Paper",
+      description: "Crisp fresh scent with mint and pear.",
+      story: "Minimal and clean.",
+      image_url: "https://images.unsplash.com/photo-1541643600914-78b084683601",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.fresh,
+      top_notes: "Mint, Pear",
+      middle_notes: "Iris, Tea",
+      base_notes: "Musk, Cedar",
+      is_featured: false,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 102, stock: 58 },
+        { size: "100ml", price: 158, stock: 36 },
+      ],
+    },
+    {
+      key: "cinderGrove",
+      brand_id: noir.id,
+      name: "Cinder Grove",
+      description: "Bitter citrus and smoked woods.",
+      story: "A bright opening that dries dark.",
+      image_url: "https://images.unsplash.com/photo-1615634260167-c8cdede054de",
+      gender: Gender.male,
+      fragrance_family: FragranceFamily.citrus,
+      top_notes: "Grapefruit, Lemon",
+      middle_notes: "Juniper, Spice",
+      base_notes: "Cedar, Amber",
+      is_featured: false,
+      is_new_arrival: false,
+      sizes: [
+        { size: "50ml", price: 112, stock: 49 },
+        { size: "100ml", price: 176, stock: 27 },
+      ],
+    },
+    {
+      key: "inkTide",
+      brand_id: noir.id,
+      name: "Ink Tide",
+      description: "Marine salt, vetiver, and smoke.",
+      story: "Aquatic freshness with a moody edge.",
+      image_url: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.aquatic,
+      top_notes: "Sea Salt, Lime",
+      middle_notes: "Lavender, Cypress",
+      base_notes: "Vetiver, Moss",
+      is_featured: true,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 128, stock: 40 },
+        { size: "100ml", price: 196, stock: 24 },
+      ],
+    },
+    {
+      key: "mossCurrent",
+      brand_id: aqua.id,
+      name: "Moss Current",
+      description: "Green moss and driftwood.",
+      story: "A coastal wood scent.",
+      image_url: "https://images.unsplash.com/photo-1616394584738-fc6e612e71b9",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.woody,
+      top_notes: "Bergamot, Pine",
+      middle_notes: "Moss, Cedar",
+      base_notes: "Amber, Vetiver",
+      is_featured: false,
+      is_new_arrival: false,
+      sizes: [
+        { size: "50ml", price: 134, stock: 37 },
+        { size: "100ml", price: 206, stock: 21 },
+      ],
+    },
+    {
       key: "crimsonEclipse",
       brand_id: noir.id,
       name: "Crimson Eclipse",
@@ -385,11 +570,303 @@ async function main(): Promise<void> {
         { size: "100ml", price: 275, stock: 18 },
       ],
     },
+    {
+      key: "velvetBlossom",
+      brand_id: maison.id,
+      name: "Velvet Blossom",
+      description: "Powdery rose with smooth musk.",
+      story: "A polished floral for daily wear.",
+      image_url: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539",
+      gender: Gender.female,
+      fragrance_family: FragranceFamily.floral,
+      top_notes: "Peony, Raspberry",
+      middle_notes: "Rose, Freesia",
+      base_notes: "Musk, Benzoin",
+      is_featured: true,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 138, stock: 38 },
+        { size: "100ml", price: 215, stock: 24 },
+      ],
+    },
+    {
+      key: "roseAster",
+      brand_id: maison.id,
+      name: "Rose Aster",
+      description: "Rose petals brightened with citrus.",
+      story: "Modern floral elegance.",
+      image_url: "https://images.unsplash.com/photo-1523293182086-7651a899d37f",
+      gender: Gender.female,
+      fragrance_family: FragranceFamily.floral,
+      top_notes: "Bergamot, Pink Pepper",
+      middle_notes: "Rose, Aster",
+      base_notes: "Amber, White Musk",
+      is_featured: false,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 132, stock: 34 },
+        { size: "100ml", price: 208, stock: 20 },
+      ],
+    },
+    {
+      key: "cedarMoss",
+      brand_id: maison.id,
+      name: "Cedar Moss",
+      description: "Soft cedarwood and green moss.",
+      story: "A grounded woody scent.",
+      image_url: "https://images.unsplash.com/photo-1616394584738-fc6e612e71b9",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.woody,
+      top_notes: "Cardamom, Juniper",
+      middle_notes: "Cedarwood, Moss",
+      base_notes: "Amber, Vetiver",
+      is_featured: false,
+      is_new_arrival: false,
+      sizes: [
+        { size: "50ml", price: 148, stock: 29 },
+        { size: "100ml", price: 228, stock: 18 },
+      ],
+    },
+    {
+      key: "seafoamCotton",
+      brand_id: aqua.id,
+      name: "Seafoam Cotton",
+      description: "Soft cotton musk with marine air.",
+      story: "Bright and airy for everyday wear.",
+      image_url: "https://images.unsplash.com/photo-1541643600914-78b084683601",
+      gender: Gender.female,
+      fragrance_family: FragranceFamily.fresh,
+      top_notes: "White Tea, Pear",
+      middle_notes: "Cotton Flower, Lily",
+      base_notes: "Musk, Cedar",
+      is_featured: false,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 98, stock: 63 },
+        { size: "100ml", price: 154, stock: 39 },
+      ],
+    },
+    {
+      key: "breezeQuartz",
+      brand_id: aqua.id,
+      name: "Breeze Quartz",
+      description: "Clean mineral freshness with herbs.",
+      story: "Cool and reflective.",
+      image_url: "https://images.unsplash.com/photo-1563170351-be82bc888aa4",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.fresh,
+      top_notes: "Mint, Lemon Zest",
+      middle_notes: "Sage, Lavender",
+      base_notes: "Musk, Driftwood",
+      is_featured: false,
+      is_new_arrival: false,
+      sizes: [
+        { size: "50ml", price: 106, stock: 57 },
+        { size: "100ml", price: 162, stock: 33 },
+      ],
+    },
+    {
+      key: "lemonCurrent",
+      brand_id: aqua.id,
+      name: "Lemon Current",
+      description: "Sparkling lemon and neroli.",
+      story: "A lively citrus wave.",
+      image_url: "https://images.unsplash.com/photo-1615634260167-c8cdede054de",
+      gender: Gender.male,
+      fragrance_family: FragranceFamily.citrus,
+      top_notes: "Lemon, Grapefruit",
+      middle_notes: "Neroli, Ginger",
+      base_notes: "White Musk, Cedar",
+      is_featured: true,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 114, stock: 46 },
+        { size: "100ml", price: 178, stock: 28 },
+      ],
+    },
+    {
+      key: "mandarinReef",
+      brand_id: aqua.id,
+      name: "Mandarin Reef",
+      description: "Mandarin zest with sea spray.",
+      story: "Bright aquatic citrus.",
+      image_url: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.citrus,
+      top_notes: "Mandarin, Lime",
+      middle_notes: "Sea Accord, Neroli",
+      base_notes: "Cedar, Musk",
+      is_featured: false,
+      is_new_arrival: false,
+      sizes: [
+        { size: "50ml", price: 116, stock: 44 },
+        { size: "100ml", price: 180, stock: 26 },
+      ],
+    },
+    {
+      key: "saltPetal",
+      brand_id: aqua.id,
+      name: "Salt Petal",
+      description: "Marine salt and pale petals.",
+      story: "A breezy aquatic floral.",
+      image_url: "https://images.unsplash.com/photo-1523293182086-7651a899d37f",
+      gender: Gender.female,
+      fragrance_family: FragranceFamily.aquatic,
+      top_notes: "Sea Salt, Pink Pepper",
+      middle_notes: "Peony, Jasmine",
+      base_notes: "Musk, Driftwood",
+      is_featured: false,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 124, stock: 41 },
+        { size: "100ml", price: 192, stock: 23 },
+      ],
+    },
+    {
+      key: "desertMirage",
+      brand_id: maison.id,
+      name: "Desert Mirage",
+      description: "Spiced resin over warm woods.",
+      story: "An amber-rich sunset trail.",
+      image_url: "https://images.unsplash.com/photo-1588405748880-12d1d2a59f75",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.oriental,
+      top_notes: "Saffron, Cinnamon",
+      middle_notes: "Incense, Labdanum",
+      base_notes: "Amber, Vanilla",
+      is_featured: false,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 172, stock: 26 },
+        { size: "100ml", price: 268, stock: 14 },
+      ],
+    },
+    {
+      key: "linenBreeze",
+      brand_id: maison.id,
+      name: "Linen Breeze",
+      description: "Clean linen with pear and airy florals.",
+      story: "Light, fresh, and easy.",
+      image_url: "https://images.unsplash.com/photo-1541643600914-78b084683601",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.fresh,
+      top_notes: "Pear, Aldehydes",
+      middle_notes: "Lily, Iris",
+      base_notes: "White Musk, Sandalwood",
+      is_featured: false,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 96, stock: 68 },
+        { size: "100ml", price: 152, stock: 40 },
+      ],
+    },
+    {
+      key: "sunlitCitron",
+      brand_id: maison.id,
+      name: "Sunlit Citron",
+      description: "Brisk citron and neroli over cedar.",
+      story: "Bright, airy, and vivid.",
+      image_url: "https://images.unsplash.com/photo-1615634260167-c8cdede054de",
+      gender: Gender.female,
+      fragrance_family: FragranceFamily.citrus,
+      top_notes: "Citron, Mandarin",
+      middle_notes: "Neroli, Ginger",
+      base_notes: "Cedar, Musk",
+      is_featured: true,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 118, stock: 52 },
+        { size: "100ml", price: 182, stock: 31 },
+      ],
+    },
+    {
+      key: "coralMist",
+      brand_id: maison.id,
+      name: "Coral Mist",
+      description: "Marine air with dewy florals and salt.",
+      story: "A coastal scent with a floral edge.",
+      image_url: "https://images.unsplash.com/photo-1563170351-be82bc888aa4",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.aquatic,
+      top_notes: "Sea Salt, Lemon",
+      middle_notes: "Jasmine, Water Lily",
+      base_notes: "Driftwood, Musk",
+      is_featured: false,
+      is_new_arrival: false,
+      sizes: [
+        { size: "50ml", price: 122, stock: 43 },
+        { size: "100ml", price: 188, stock: 22 },
+      ],
+    },
+    {
+      key: "midnightCedar",
+      brand_id: noir.id,
+      name: "Midnight Cedar",
+      description: "Dark cedar with smoky resin.",
+      story: "A dense woody scent with nightlife energy.",
+      image_url: "https://images.unsplash.com/photo-1616394584738-fc6e612e71b9",
+      gender: Gender.unisex,
+      fragrance_family: FragranceFamily.woody,
+      top_notes: "Black Pepper, Nutmeg",
+      middle_notes: "Cedar, Smoke",
+      base_notes: "Patchouli, Amber",
+      is_featured: true,
+      is_new_arrival: false,
+      sizes: [
+        { size: "50ml", price: 156, stock: 27 },
+        { size: "100ml", price: 240, stock: 17 },
+      ],
+    },
+    {
+      key: "smokeAtlas",
+      brand_id: noir.id,
+      name: "Smoke Atlas",
+      description: "Leather, smoke, and cedar.",
+      story: "Built for evening wear.",
+      image_url: "https://images.unsplash.com/photo-1519669011783-4eaa95fa1b7d",
+      gender: Gender.male,
+      fragrance_family: FragranceFamily.woody,
+      top_notes: "Cardamom, Black Pepper",
+      middle_notes: "Leather, Cedarwood",
+      base_notes: "Vetiver, Tonka",
+      is_featured: false,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 164, stock: 23 },
+        { size: "100ml", price: 252, stock: 12 },
+      ],
+    },
+    {
+      key: "blackIris",
+      brand_id: noir.id,
+      name: "Black Iris",
+      description: "Iris, rose, and incense.",
+      story: "A noir floral after sunset.",
+      image_url: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539",
+      gender: Gender.female,
+      fragrance_family: FragranceFamily.floral,
+      top_notes: "Bergamot, Black Pepper",
+      middle_notes: "Iris, Rose",
+      base_notes: "Incense, Amber",
+      is_featured: false,
+      is_new_arrival: true,
+      sizes: [
+        { size: "50ml", price: 146, stock: 31 },
+        { size: "100ml", price: 226, stock: 19 },
+      ],
+    },
   ];
+
+  const productSeedData = await Promise.all(
+    productSeeds.map(async (seed) => ({
+      ...seed,
+      image_url: await materializeSeedImage(seed.image_url, "products", seed.key),
+    })),
+  );
 
   const productIds: Record<string, string> = {};
 
-  for (const seed of productSeeds) {
+  for (const seed of productSeedData) {
     const { key, sizes, ...productData } = seed;
     const product = await prisma.product.create({
       data: {
@@ -400,34 +877,41 @@ async function main(): Promise<void> {
     productIds[key] = product.id;
   }
 
+  const bannerSeeds = [
+    {
+      image_url: "https://images.unsplash.com/photo-1594035910387-fea47794261f",
+      title: "Best Seller: Amber Oud Reserve",
+      product_id: productIds.amberOud,
+    },
+    {
+      image_url: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539",
+      title: "New Arrival: Velvet Rose",
+      product_id: productIds.velvetRose,
+    },
+    {
+      image_url: "https://images.unsplash.com/photo-1615634260167-c8cdede054de",
+      title: "Summer Picks",
+      product_id: productIds.citrusDrift,
+    },
+    {
+      image_url: "https://images.unsplash.com/photo-1523293182086-7651a899d37f",
+      title: "Immersive Drop: Solar Bloom",
+      product_id: productIds.solarBloom,
+    },
+    {
+      image_url: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519",
+      title: "Game Day Fresh: Pixel Tide",
+      product_id: productIds.pixelTide,
+    },
+  ];
+
   await prisma.banner.createMany({
-    data: [
-      {
-        image_url: "https://images.unsplash.com/photo-1594035910387-fea47794261f",
-        title: "Best Seller: Amber Oud Reserve",
-        product_id: productIds.amberOud,
-      },
-      {
-        image_url: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539",
-        title: "New Arrival: Velvet Rose",
-        product_id: productIds.velvetRose,
-      },
-      {
-        image_url: "https://images.unsplash.com/photo-1615634260167-c8cdede054de",
-        title: "Summer Picks",
-        product_id: productIds.citrusDrift,
-      },
-      {
-        image_url: "https://images.unsplash.com/photo-1523293182086-7651a899d37f",
-        title: "Immersive Drop: Solar Bloom",
-        product_id: productIds.solarBloom,
-      },
-      {
-        image_url: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519",
-        title: "Game Day Fresh: Pixel Tide",
-        product_id: productIds.pixelTide,
-      },
-    ],
+    data: await Promise.all(
+      bannerSeeds.map(async (banner) => ({
+        ...banner,
+        image_url: await materializeSeedImage(banner.image_url, "banners", banner.title),
+      })),
+    ),
   });
 
   const customerMainAddress = await prisma.address.create({

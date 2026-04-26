@@ -249,6 +249,7 @@ export class auth_services {
             },
             select: {
                 id: true,
+                role: true,
                 _count: {
                     select: {
                         orders: true,
@@ -262,12 +263,47 @@ export class auth_services {
             throw new Error("User not found");
         }
 
+        if (user.role === "delivery_person") {
+            const [assignedOrders, deliveredOrders] = await Promise.all([
+                prisma.order.count({
+                    where: {
+                        delivery_person_id: userId,
+                        status: {
+                            in: ["pending", "paid", "shipped"],
+                        },
+                    },
+                }),
+                prisma.order.count({
+                    where: {
+                        delivery_person_id: userId,
+                        status: "delivered",
+                    },
+                }),
+            ]);
+
+            return {
+                total_orders: assignedOrders,
+                assigned_orders: assignedOrders,
+                delivered_orders: deliveredOrders,
+                reviews_count: user._count.reviews,
+                // Backward-compatible aliases for existing clients.
+                orders_count: assignedOrders,
+            };
+        }
+
+        const deliveredOrders = await prisma.order.count({
+            where: {
+                user_id: userId,
+                status: "delivered",
+            },
+        });
+
         return {
             total_orders: user._count.orders,
             reviews_count: user._count.reviews,
+            delivered_orders: deliveredOrders,
             // Backward-compatible aliases for existing clients.
             orders_count: user._count.orders,
-            delivered_orders: user._count.orders,
         };
     }
 

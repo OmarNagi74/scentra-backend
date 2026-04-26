@@ -286,11 +286,13 @@ model DeliveryMessage {
   order_id  String
   sender    DeliveryMessageSender
   message   String                    @db.Text
+  read_at   DateTime?
   created_at DateTime                 @default(now())
 
   order   Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
 
   @@index([order_id])
+  @@index([order_id, read_at])
 }
 
 //////////////////////
