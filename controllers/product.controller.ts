@@ -78,6 +78,11 @@ export const createProduct = async (req : any , res : Response) => {
             }
         }
 
+        if (error instanceof Prisma.PrismaClientValidationError) {
+            res.status(400).json({ error: "Invalid create payload. Please check brand_id, gender, fragrance_family, and sizes." });
+            return;
+        }
+
         res.status(500).json({ error : message }) ;
     }
 }

@@ -20,6 +20,103 @@ const ALLOWED_FRAGRANCE_FAMILIES = new Set([
     "aquatic",
 ]);
 
+const GENDER_ALIASES: Record<string, string> = {
+    men: "male",
+    man: "male",
+    male: "male",
+    women: "female",
+    woman: "female",
+    female: "female",
+    unisex: "unisex",
+};
+
+const parseBooleanLike = (value: unknown): boolean | undefined => {
+    if (typeof value === "boolean") {
+        return value;
+    }
+
+    if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === "true") {
+            return true;
+        }
+
+        if (normalized === "false") {
+            return false;
+        }
+    }
+
+    return undefined;
+};
+
+const toOptionalString = (value: unknown): string | undefined => {
+    if (typeof value !== "string") {
+        return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const parseSizesPayload = (rawSizes: unknown): Array<{ size: string; price: number; stock: number }> => {
+    let payload = rawSizes;
+
+    if (typeof payload === "string") {
+        const trimmed = payload.trim();
+
+        if (!trimmed) {
+            throw new ProductServiceError(400, "At least one size is required");
+        }
+
+        try {
+            payload = JSON.parse(trimmed);
+        }
+        catch {
+            throw new ProductServiceError(400, "sizes must be a valid JSON array");
+        }
+    }
+
+    if (!Array.isArray(payload) || payload.length === 0) {
+        throw new ProductServiceError(400, "At least one size is required");
+    }
+
+    const normalized = payload.map((entry: any) => {
+        const size = typeof entry?.size === "string" ? entry.size.trim() : "";
+        const price = Number(entry?.price);
+        const stock = Number(entry?.stock);
+
+        if (!size) {
+            throw new ProductServiceError(400, "Each size requires a non-empty size value");
+        }
+
+        if (!Number.isFinite(price) || price <= 0) {
+            throw new ProductServiceError(400, `Invalid price for size ${size}`);
+        }
+
+        if (!Number.isFinite(stock) || stock < 0) {
+            throw new ProductServiceError(400, `Invalid stock for size ${size}`);
+        }
+
+        return {
+            size,
+            price,
+            stock: Math.floor(stock),
+        };
+    });
+
+    const sizeKeys = new Set<string>();
+    for (const item of normalized) {
+        const key = item.size.toLowerCase();
+        if (sizeKeys.has(key)) {
+            throw new ProductServiceError(400, `Duplicate size value: ${item.size}`);
+        }
+
+        sizeKeys.add(key);
+    }
+
+    return normalized;
+};
+
 const normalizeBrand = (baseUrl: string, brand?: { id: string; name: string; logo_url?: string | null } | null) => {
     if (!brand) {
         return brand;
@@ -158,24 +255,32 @@ export class product_services {
     // createProduct => only for admin
     async createProductService (data : {
         brand_id: string;
+        brandId?: string;
         name: string;
         description?: string;
         story?: string;
         image_url?: string;
+        imageUrl?: string;
         gender: string;
+        fragranceFamily?: string;
         fragrance_family: string;
         top_notes?: string;
         middle_notes?: string;
         base_notes?: string;
         is_featured?: boolean;
         is_new_arrival?: boolean;
-        sizes: { size: string; price: number; stock: number }[];
+        sizes: { size: string; price: number; stock: number }[] | string;
     }, baseUrl = "") {
-        const brandId = typeof data.brand_id === "string" ? data.brand_id.trim() : "";
-        const name = typeof data.name === "string" ? data.name.trim() : "";
-        const gender = typeof data.gender === "string" ? data.gender.trim().toLowerCase() : "";
-        const fragranceFamily = typeof data.fragrance_family === "string"
-            ? data.fragrance_family.trim().toLowerCase()
+        const brandIdRaw = data?.brand_id ?? data?.brandId;
+        const fragranceFamilyRaw = data?.fragrance_family ?? data?.fragranceFamily;
+        const imageUrlRaw = data?.image_url ?? data?.imageUrl;
+
+        const brandId = typeof brandIdRaw === "string" ? brandIdRaw.trim() : "";
+        const name = typeof data?.name === "string" ? data.name.trim() : "";
+        const resolvedGender = typeof data?.gender === "string" ? data.gender.trim().toLowerCase() : "";
+        const gender = GENDER_ALIASES[resolvedGender] ?? resolvedGender;
+        const fragranceFamily = typeof fragranceFamilyRaw === "string"
+            ? fragranceFamilyRaw.trim().toLowerCase()
             : "";
 
         if (!brandId) {
@@ -194,42 +299,7 @@ export class product_services {
             throw new ProductServiceError(400, "Invalid fragrance_family");
         }
 
-        if (!Array.isArray(data.sizes) || data.sizes.length === 0) {
-            throw new ProductServiceError(400, "At least one size is required");
-        }
-
-        const normalizedSizes = data.sizes.map((entry) => {
-            const size = typeof entry.size === "string" ? entry.size.trim() : "";
-            const price = Number(entry.price);
-            const stock = Number(entry.stock);
-
-            if (!size) {
-                throw new ProductServiceError(400, "Each size requires a non-empty size value");
-            }
-
-            if (!Number.isFinite(price) || price <= 0) {
-                throw new ProductServiceError(400, `Invalid price for size ${size}`);
-            }
-
-            if (!Number.isFinite(stock) || stock < 0) {
-                throw new ProductServiceError(400, `Invalid stock for size ${size}`);
-            }
-
-            return {
-                size,
-                price,
-                stock: Math.floor(stock),
-            };
-        });
-
-        const sizeKeys = new Set<string>();
-        for (const size of normalizedSizes) {
-            const key = size.size.toLowerCase();
-            if (sizeKeys.has(key)) {
-                throw new ProductServiceError(400, `Duplicate size value: ${size.size}`);
-            }
-            sizeKeys.add(key);
-        }
+        const normalizedSizes = parseSizesPayload(data?.sizes);
 
         const existingBrand = await prisma.brand.findUnique({
             where: { id: brandId },
@@ -240,16 +310,20 @@ export class product_services {
             throw new ProductServiceError(404, "Brand not found");
         }
 
-        const {sizes , ...productData} = data ;
-        void sizes;
-
         const product = await prisma.product.create({
             data : {
-                ...productData,
                 brand_id: brandId,
                 name,
+                description: toOptionalString(data?.description),
+                story: toOptionalString(data?.story),
+                image_url: toOptionalString(imageUrlRaw),
                 gender : gender as any ,
                 fragrance_family : fragranceFamily as any ,
+                top_notes: toOptionalString(data?.top_notes),
+                middle_notes: toOptionalString(data?.middle_notes),
+                base_notes: toOptionalString(data?.base_notes),
+                is_featured: parseBooleanLike(data?.is_featured) ?? false,
+                is_new_arrival: parseBooleanLike(data?.is_new_arrival) ?? false,
                 sizes : {
                     create : normalizedSizes
                 }
