@@ -18,6 +18,7 @@ datasource db {
 enum Role {
   admin
   customer
+  delivery_person
 }
 
 enum Gender {
@@ -43,6 +44,12 @@ enum FragranceFamily {
   aquatic
 }
 
+enum DeliveryMessageSender {
+  customer
+  delivery
+  system
+}
+
 //////////////////////
 // USERS
 //////////////////////
@@ -63,12 +70,13 @@ model User {
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
-  addresses Address[]
-  orders    Order[]
-  wishlist  Wishlist?
-  cart      Cart?
-  reviews   Review[]
-  payments  PaymentMethod[]
+  addresses       Address[]
+  orders          Order[]
+  delivery_orders Order[]          @relation("DeliveryPersonOrders")
+  wishlist        Wishlist?
+  cart            Cart?
+  reviews         Review[]
+  payments        PaymentMethod[]
 }
 
 //////////////////////
@@ -85,6 +93,8 @@ model Address {
   zip_code   String   @db.VarChar(20)
   country    String   @db.VarChar(100)
   is_default Boolean  @default(false)
+  latitude   Float?
+  longitude  Float?
   created_at DateTime @default(now())
 
   user   User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -158,23 +168,32 @@ model ProductSize {
 //////////////////////
 
 model Order {
-  id          String      @id @default(uuid())
-  user_id     String
-  address_id  String
-  status      OrderStatus @default(pending)
-  total_price Decimal     @db.Decimal(10, 2)
+  id                          String      @id @default(uuid())
+  user_id                     String
+  address_id                  String
+  delivery_person_id          String?
+  status                      OrderStatus @default(pending)
+  total_price                 Decimal     @db.Decimal(10, 2)
 
-  payment_method  String?
-  delivery_method String?
+  payment_method              String?
+  delivery_method             String?
+  delivery_latitude           Float?
+  delivery_longitude          Float?
+  delivery_location_updated_at DateTime?
+  assigned_at                 DateTime?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  user        User        @relation(fields: [user_id], references: [id])
-  address     Address     @relation(fields: [address_id], references: [id])
-  order_items OrderItem[]
+  user              User                @relation(fields: [user_id], references: [id])
+  address           Address             @relation(fields: [address_id], references: [id])
+  delivery_person   User?               @relation("DeliveryPersonOrders", fields: [delivery_person_id], references: [id])
+  order_items       OrderItem[]
+  delivery_messages DeliveryMessage[]
 
   @@index([user_id])
+  @@index([delivery_person_id])
+  @@index([status])
 }
 
 model OrderItem {
@@ -256,6 +275,24 @@ model Review {
   product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, product_id])
+}
+
+//////////////////////
+// DELIVERY MESSAGES
+//////////////////////
+
+model DeliveryMessage {
+  id        String                    @id @default(uuid())
+  order_id  String
+  sender    DeliveryMessageSender
+  message   String                    @db.Text
+  read_at   DateTime?
+  created_at DateTime                 @default(now())
+
+  order   Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@index([order_id])
+  @@index([order_id, read_at])
 }
 
 //////////////////////

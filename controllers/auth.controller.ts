@@ -115,6 +115,13 @@ export const getMe = async(req : any , res : Response) =>{
     try {
 
         const userId = req.user.userId ;
+        if (!userId) {
+            res.status(401).json({
+                msg : "Unauthorized"
+            });
+            return;
+        }
+
         const user = await authService.getMeService(userId) ;
 
         res.status(200).json({
@@ -122,6 +129,13 @@ export const getMe = async(req : any , res : Response) =>{
         });
     }
     catch(err : any){
+        if (err.message === "User not found") {
+            res.status(401).json({
+                msg : "Invalid session. Please login again"
+            });
+            return;
+        }
+
         res.status(400).json({
             msg : err.message 
         });
@@ -131,6 +145,13 @@ export const getMe = async(req : any , res : Response) =>{
 export const getMyStats = async (req: any, res: Response) => {
     try {
         const userId = req.user.userId;
+        if (!userId) {
+            res.status(401).json({
+                msg : "Unauthorized"
+            });
+            return;
+        }
+
         const stats = await authService.getMyStatsService(userId);
 
         res.status(200).json({
@@ -138,6 +159,13 @@ export const getMyStats = async (req: any, res: Response) => {
         });
     }
     catch (err: any) {
+        if (err.message === "User not found") {
+            res.status(401).json({
+                msg : "Invalid session. Please login again"
+            });
+            return;
+        }
+
         res.status(400).json({
             msg: err.message,
         });
