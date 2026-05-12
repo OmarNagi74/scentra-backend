@@ -1,19 +1,19 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { changePassword, getMe, getMyStats, Login, logout, register, removeAvatarImage, resendVerification, signup, updateProfile, uploadAvatarImage, verifyEmail, verifyOtpAndCreateUser } from "../controllers/auth.controller";
 import { authMiddleware } from "../middlewares/authMiddleware";
-import { createRateLimit } from "../middlewares/rateLimit";
 import { uploadAvatar } from "../middlewares/uploadMiddleware";
 
 const authRouter = Router() ;
-const signupRateLimit = createRateLimit({
+const signupRateLimit = rateLimit({
     windowMs: 10 * 60 * 1000,
-    maxRequests: 5,
-    message: "Too many signup attempts. Please try again later.",
+    limit: 5,
+    message: { error: "Too many signup attempts. Please try again later." },
 });
-const verifyOtpRateLimit = createRateLimit({
+const verifyOtpRateLimit = rateLimit({
     windowMs: 10 * 60 * 1000,
-    maxRequests: 10,
-    message: "Too many OTP verification attempts. Please try again later.",
+    limit: 10,
+    message: { error: "Too many OTP verification attempts. Please try again later." },
 });
 
 authRouter.post('/register' , register);

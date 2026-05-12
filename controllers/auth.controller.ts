@@ -57,6 +57,7 @@ export const signup = async (req: Request, res: Response) => {
             }
         }
 
+        // Generates a 6-digit OTP from 100000 to 999999.
         const otp = randomInt(100000, 1000000);
         const emailSent = await sendOTPEmail(normalizedEmail, otp);
         if (!emailSent) {
@@ -97,13 +98,23 @@ export const verifyOtpAndCreateUser = async (req: Request, res: Response) => {
             password: String(password),
         });
 
-        await firebaseAdmin.firestore().collection("users").doc(userRecord.uid).set({
-            email: normalizedEmail,
-            createdAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
-            verified: true,
-        });
+        try {
+            await firebaseAdmin.firestore().collection("users").doc(userRecord.uid).set({
+                email: normalizedEmail,
+                createdAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
+                verified: true,
+            });
 
-        await firebaseAdmin.firestore().collection("otps").doc(normalizedEmail).delete();
+            await firebaseAdmin.firestore().collection("otps").doc(normalizedEmail).delete();
+        } catch (firestoreError) {
+            try {
+                await firebaseAdmin.auth().deleteUser(userRecord.uid);
+            } catch (rollbackError) {
+                console.error("Failed to rollback Firebase Auth user after Firestore error:", rollbackError);
+            }
+
+            throw firestoreError;
+        }
 
         res.status(200).json({
             message: "User created successfully",
