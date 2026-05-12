@@ -1,13 +1,15 @@
 import { Router } from "express";
-import { changePassword, getMe, getMyStats, Login, logout, register, removeAvatarImage, resendVerification, updateProfile, uploadAvatarImage, verifyEmail } from "../controllers/auth.controller";
+import { changePassword, getMe, getMyStats, Login, logout, register, removeAvatarImage, resendVerification, signup, updateProfile, uploadAvatarImage, verifyEmail, verifyOtpAndCreateUser } from "../controllers/auth.controller";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import { uploadAvatar } from "../middlewares/uploadMiddleware";
 
 const authRouter = Router() ;
 
 authRouter.post('/register' , register);
+authRouter.post('/signup', signup);
 authRouter.post('/login' , Login) ;
 authRouter.post('/verify-email', verifyEmail);
+authRouter.post('/verify-otp', verifyOtpAndCreateUser);
 authRouter.post('/resend-verification', resendVerification);
 authRouter.post('/logout', authMiddleware(), logout);
 authRouter.get('/me' , authMiddleware() ,getMe) ;
