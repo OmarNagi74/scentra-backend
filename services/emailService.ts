@@ -1,19 +1,33 @@
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
 
+const OTP_EXPIRATION_MS = 10 * 60 * 1000;
+const firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
+
+if (!firebaseProjectId) {
+    throw new Error("FIREBASE_PROJECT_ID is required for Firebase email service");
+}
+
 if (!admin.apps.length) {
     admin.initializeApp({
-        projectId: process.env.FIREBASE_PROJECT_ID,
+        projectId: firebaseProjectId,
     });
 }
 
-const db = admin.firestore();
+const gmailUser = process.env.GMAIL_USER;
+const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
+
+if (!gmailUser || !gmailAppPassword) {
+    throw new Error("GMAIL_USER and GMAIL_APP_PASSWORD are required for email service");
+}
+
+const getDb = () => admin.firestore();
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
+        user: gmailUser,
+        pass: gmailAppPassword,
     },
 });
 
@@ -22,7 +36,7 @@ export const getFirebaseAdmin = () => admin;
 export async function sendOTPEmail(email: string, otp: string | number) {
     try {
         await transporter.sendMail({
-            from: process.env.GMAIL_USER,
+            from: gmailUser,
             to: email,
             subject: "Your OTP Code - Scentra",
             html: `
@@ -36,8 +50,8 @@ export async function sendOTPEmail(email: string, otp: string | number) {
       `,
         });
 
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-        await db.collection("otps").doc(email).set({
+        const expiresAt = new Date(Date.now() + OTP_EXPIRATION_MS);
+        await getDb().collection("otps").doc(email).set({
             code: otp.toString(),
             email,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -55,7 +69,7 @@ export async function sendOTPEmail(email: string, otp: string | number) {
 
 export async function verifyOTP(email: string, otp: string | number) {
     try {
-        const otpDoc = await db.collection("otps").doc(email).get();
+        const otpDoc = await getDb().collection("otps").doc(email).get();
 
         if (!otpDoc.exists) {
             console.log(`[OTP VERIFY] No OTP found for ${email}`);
@@ -78,7 +92,7 @@ export async function verifyOTP(email: string, otp: string | number) {
             return false;
         }
 
-        await db.collection("otps").doc(email).update({
+        await getDb().collection("otps").doc(email).update({
             verified: true,
         });
 
@@ -93,7 +107,7 @@ export async function verifyOTP(email: string, otp: string | number) {
 export async function sendPasswordResetEmail(email: string, resetLink: string) {
     try {
         await transporter.sendMail({
-            from: process.env.GMAIL_USER,
+            from: gmailUser,
             to: email,
             subject: "Reset Your Password - Scentra",
             html: `
@@ -124,7 +138,7 @@ export async function sendOrderConfirmationEmail(
 ) {
     try {
         await transporter.sendMail({
-            from: process.env.GMAIL_USER,
+            from: gmailUser,
             to: email,
             subject: "Order Confirmation - Scentra",
             html: `
@@ -148,7 +162,7 @@ export async function sendOrderConfirmationEmail(
 export async function sendNotificationEmail(email: string, message: string) {
     try {
         await transporter.sendMail({
-            from: process.env.GMAIL_USER,
+            from: gmailUser,
             to: email,
             subject: "Notification - Scentra",
             html: `<div style="font-family: Arial, sans-serif;"><p>${message}</p></div>`,
@@ -170,7 +184,7 @@ export async function sendMarketingEmail(
 ) {
     try {
         await transporter.sendMail({
-            from: process.env.GMAIL_USER,
+            from: gmailUser,
             to: email,
             subject: campaignContent.subject,
             html: campaignContent.html,

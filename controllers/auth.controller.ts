@@ -1,12 +1,12 @@
 import { Request , Response } from "express";
 import multer from "multer";
+import { randomInt } from "crypto";
 import { auth_services } from "../services/auth.service";
 import { toPublicUploadPath } from "../utils/uploadFile";
 import { getFirebaseAdmin, sendOTPEmail, verifyOTP } from "../services/emailService";
 
 const authService = new auth_services() ;
 const firebaseAdmin = getFirebaseAdmin();
-const firebaseDb = firebaseAdmin.firestore();
 
 export const register = async (req: Request, res: Response) => {
 
@@ -57,7 +57,7 @@ export const signup = async (req: Request, res: Response) => {
             }
         }
 
-        const otp = Math.floor(100000 + Math.random() * 900000);
+        const otp = randomInt(100000, 1000000);
         const emailSent = await sendOTPEmail(normalizedEmail, otp);
         if (!emailSent) {
             res.status(500).json({ error: "Failed to send OTP email" });
@@ -97,13 +97,13 @@ export const verifyOtpAndCreateUser = async (req: Request, res: Response) => {
             password: String(password),
         });
 
-        await firebaseDb.collection("users").doc(userRecord.uid).set({
+        await firebaseAdmin.firestore().collection("users").doc(userRecord.uid).set({
             email: normalizedEmail,
             createdAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
             verified: true,
         });
 
-        await firebaseDb.collection("otps").doc(normalizedEmail).delete();
+        await firebaseAdmin.firestore().collection("otps").doc(normalizedEmail).delete();
 
         res.status(200).json({
             message: "User created successfully",
