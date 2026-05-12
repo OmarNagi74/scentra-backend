@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { randomInt } from "crypto";
 import { deleteLocalUploadIfExists } from "../utils/uploadFile";
+import { sendOTPEmail } from "./emailService";
 
 export class auth_services {
     constructor(){}
@@ -31,6 +32,11 @@ export class auth_services {
 
         if (process.env.NODE_ENV !== "production") {
             console.info(`[DEV-EMAIL] verification code for ${email}: ${verificationCode}`);
+        }
+
+        const emailSent = await sendOTPEmail(email, verificationCode);
+        if (!emailSent) {
+            throw new Error("Failed to send verification email. Please try again later.");
         }
     }
 
