@@ -1,9 +1,12 @@
 import { Request , Response } from "express";
 import multer from "multer";
+import { randomInt } from "crypto";
 import { auth_services } from "../services/auth.service";
 import { toPublicUploadPath } from "../utils/uploadFile";
+import { getFirebaseAdmin, sendOTPEmail, verifyOTP } from "../services/emailService";
 
 const authService = new auth_services() ;
+const firebaseAdmin = getFirebaseAdmin();
 
 export const register = async (req: Request, res: Response) => {
 
@@ -28,6 +31,104 @@ export const register = async (req: Request, res: Response) => {
         res.status(400).json({
             msg : err.message 
         });
+    }
+}
+
+export const signup = async (req: Request, res: Response) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            res.status(400).json({
+                error: "Email and password are required",
+            });
+            return;
+        }
+
+        const normalizedEmail = String(email).trim().toLowerCase();
+
+        try {
+            await firebaseAdmin.auth().getUserByEmail(normalizedEmail);
+            res.status(400).json({ error: "Email already registered" });
+            return;
+        } catch (error: any) {
+            if (error?.code !== "auth/user-not-found") {
+                throw error;
+            }
+        }
+
+        // Generates a 6-digit OTP from 100000 to 999999.
+        const otp = randomInt(100000, 1000000);
+        const emailSent = await sendOTPEmail(normalizedEmail, otp);
+        if (!emailSent) {
+            res.status(500).json({ error: "Failed to send OTP email" });
+            return;
+        }
+
+        res.status(200).json({
+            message: "OTP sent to email",
+            email: normalizedEmail,
+        });
+    } catch (error) {
+        console.error("Signup error:", error);
+        res.status(500).json({ error: "Signup failed" });
+    }
+}
+
+export const verifyOtpAndCreateUser = async (req: Request, res: Response) => {
+    try {
+        const { email, otp, password } = req.body;
+
+        if (!email || !otp || !password) {
+            res.status(400).json({
+                error: "Email, OTP, and password are required",
+            });
+            return;
+        }
+
+        const normalizedEmail = String(email).trim().toLowerCase();
+        const isValid = await verifyOTP(normalizedEmail, otp);
+        if (!isValid) {
+            res.status(400).json({ error: "Invalid or expired OTP" });
+            return;
+        }
+
+        const userRecord = await firebaseAdmin.auth().createUser({
+            email: normalizedEmail,
+            password: String(password),
+        });
+
+        try {
+            await firebaseAdmin.firestore().collection("users").doc(userRecord.uid).set({
+                email: normalizedEmail,
+                createdAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
+                verified: true,
+            });
+
+            await firebaseAdmin.firestore().collection("otps").doc(normalizedEmail).delete();
+        } catch (firestoreError) {
+            try {
+                await firebaseAdmin.auth().deleteUser(userRecord.uid);
+            } catch (rollbackError) {
+                console.error("Failed to rollback Firebase Auth user after Firestore error:", rollbackError);
+            }
+
+            throw firestoreError;
+        }
+
+        res.status(200).json({
+            message: "User created successfully",
+            uid: userRecord.uid,
+        });
+    } catch (error: any) {
+        console.error("OTP verification error:", error);
+
+        if (error?.code === "auth/email-already-exists") {
+            res.status(400).json({ error: "Email already registered" });
+            return;
+        }
+
+        res.status(500).json({ error: "Verification failed" });
     }
 }
 
