@@ -63,7 +63,6 @@ Backend API for a perfume e-commerce platform with authentication, catalog/disco
   - subtotal
   - tax (15% estimate from cart service)
   - total
-- note: final checkout currently recalculates tax at 8% in order placement logic
 - Add item by product + size
 - Update quantity and size selection
 - Remove single item
@@ -180,7 +179,7 @@ Required and optional variables used by the backend:
 - `JWT_SECRET`
 
 ### Server and upload configuration
-- `PORT` (optional, defaults to 4001; if busy, it retries sequentially on 4002, 4003, ... up to 10 attempts)
+- `PORT` (optional, defaults to 4001)
 - `MAX_FILE_SIZE` (optional upload limit, bytes)
 - `NODE_ENV` (optional, affects dev logging)
 
@@ -209,7 +208,7 @@ Required and optional variables used by the backend:
 
 ## Scripts
 - `npm run dev` → starts server with nodemon + ts-node
-- `npm test` → placeholder script (test suite is not implemented yet in this repository)
+- `npm test` → placeholder script
 
 ## Notes
 - Uploaded files are served from `/uploads`
