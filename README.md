@@ -87,7 +87,7 @@ Backend API for a perfume e-commerce platform with authentication, catalog/disco
   - verifies cart/address
   - decrements inventory in transaction
   - calculates totals (8% tax + express shipping fee)
-  - note: checkout tax calculation currently differs from cart estimate
+  - note: current implementation uses 8% at checkout while cart summary uses 15%
   - creates order items
   - clears cart
   - awards loyalty points
