@@ -61,7 +61,7 @@ Backend API for a perfume e-commerce platform with authentication, catalog/disco
 ### 5) Cart Management
 - Get cart items + computed summary
   - subtotal
-  - tax (15%)
+  - tax (15% estimate)
   - total
 - Add item by product + size
 - Update quantity and size selection
@@ -87,6 +87,7 @@ Backend API for a perfume e-commerce platform with authentication, catalog/disco
   - verifies cart/address
   - decrements inventory in transaction
   - calculates totals (8% tax + express shipping fee)
+  - note: checkout tax calculation currently differs from cart estimate
   - creates order items
   - clears cart
   - awards loyalty points
@@ -178,7 +179,7 @@ Required and optional variables used by the backend:
 - `JWT_SECRET`
 
 ### Server and upload configuration
-- `PORT` (optional, default attempts start at 4001)
+- `PORT` (optional, defaults to 4001; if busy, the server retries the next ports)
 - `MAX_FILE_SIZE` (optional upload limit, bytes)
 - `NODE_ENV` (optional, affects dev logging)
 
